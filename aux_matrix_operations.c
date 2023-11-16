@@ -1,4 +1,4 @@
-#include "matrix_operations.h"
+#include "aux_matrix_operations.h"
 #include <math.h>
 
 int matricesAreEqual(double **matrix1, double **matrix2, int size) {
