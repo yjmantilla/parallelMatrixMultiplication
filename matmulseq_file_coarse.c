@@ -3,214 +3,123 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#define NUM_THREADS 4
-#define EPSILON 1e-6  // Tolerance for floating point comparison
+#include <string.h>
+#include "matrix_operations.h"
 
-int matricesAreEqual(double **matrix1, double **matrix2, int size) {
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            if (fabs(matrix1[i][j] - matrix2[i][j]) > EPSILON) {
-                return 0; // Matrices are not equal
-            }
+#define N_THREADS 4
+
+typedef struct {
+    int jobId;
+    char fname[256];
+    int pair;
+    // Other job-specific data
+} Job;
+
+typedef struct {
+    Job *jobs;
+    int totalJobs;
+    int nextJob;
+    pthread_mutex_t *mutex;
+} ThreadData;
+
+void *coarse_worker(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    char newFilename[256]; // Adjust size as needed
+    double **a, **b, **c;
+    int matrixSize;
+    int nmats;
+
+    while (1) {
+        pthread_mutex_lock(data->mutex);
+        if (data->nextJob >= data->totalJobs) {
+            pthread_mutex_unlock(data->mutex);
+            free(*a);
+            free(a);
+            free(*b);
+            free(b);
+            free(*c);
+            free(c);
+            break; // No more jobs to process
         }
-    }
-    return 1; // Matrices are equal
-}
 
-double **allocateMatrix(int size) {
-    int i;
-    double *vals, **temp;
+        Job job = data->jobs[data->nextJob++];
+        pthread_mutex_unlock(data->mutex);
 
-    // allocate space for values of a matrix
-    vals = (double *) malloc(size * size * sizeof(double));
-    if (vals == NULL) {
-        fprintf(stderr, "Memory allocation failed for matrix values\n");
-        exit(1);
-    }
+        printf("Thread processing job %d\n", job.jobId);
 
-    // allocate vector of pointers to create the 2D array
-    temp = (double **) malloc(size * sizeof(double*));
-    if (temp == NULL) {
-        fprintf(stderr, "Memory allocation failed for matrix pointers\n");
-        free(vals); // Free previously allocated memory
-        exit(1);
+        // Process the job...
+        readMatrixInfo(job.fname, &nmats, &matrixSize);
+
+        printf("Multiplying two matrices...\n"); //Remove this line for performance tests
+        //Dynamically create matrices of the size needed
+        a = allocateMatrix(matrixSize);
+        b = allocateMatrix(matrixSize);
+        c = allocateMatrix(matrixSize);
+
+        matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b);
+        mm(a, b, c, matrixSize);
+        snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",job.fname, job.pair, "COARSE.dat");
+        writeMatrixToFile(c,matrixSize,newFilename);
     }
 
-    for (i = 0; i < size; i++)
-        temp[i] = &vals[i * size];
-
-    return temp;
-}
-
-
-void mm(double **a, double **b, double **c, int matrixSize) {
-    int i, j, k;
-    double sum;
-
-    // matrix multiplication
-    for (i = 0; i < matrixSize; i++) {
-        for (j = 0; j < matrixSize; j++) {
-            sum = 0.0;
-            // dot product
-            for (k = 0; k < matrixSize; k++) {
-                sum += a[i][k] * b[k][j];
-            }
-            c[i][j] = sum;
-        }
-    }
-}
-
-void printResult(double **matrix, int size) {
-    int i, j;
-    for(i = 0; i < size; i++) {
-        for(j = 0; j < size; j++) {
-            printf("%lf ", matrix[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-void writeMatrixToFile(double **matrix, int size, const char *filename) {
-    FILE *file = fopen(filename, "w");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-    // Write the size of the matrix at the beginning of the file
-    fprintf(file, "%d\n", size);
-
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            fprintf(file, "%lf ", matrix[i][j]);
-        }
-        fprintf(file, "\n");
-    }
-
-    fclose(file);
-}
-
-int readMatrixFromFile(const char *filename, double ***matrixPtr) {
-    FILE *file = fopen(filename, "r");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-    int size;
-    if (fscanf(file, "%d", &size) != 1) {
-        fprintf(stderr, "Error reading matrix size from file\n");
-        fclose(file);
-        exit(1);
-    }
-
-    double **matrix = allocateMatrix(size);
-
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            if (fscanf(file, "%lf", &matrix[i][j]) != 1) {
-                fprintf(stderr, "Error reading matrix from file\n");
-                fclose(file);
-                exit(1);
-            }
-        }
-    }
-
-    fclose(file);
-    *matrixPtr = matrix;
-    return size;
-}
-
-void readMatrixPair(FILE* fh, double** matrix, int matrixSize) {
-    for (int i = 0; i < matrixSize; i++) {
-        for (int j = 0; j < matrixSize; j++) {
-            fscanf(fh, "%lf", &matrix[i][j]);
-        }
-    }
-}
-
-void readSpecificMatrixPair(const char* filename, int pairIndex, int matrixSize, double** matrix1, double** matrix2) {
-    FILE* fh = fopen(filename, "r");
-    if (fh == NULL) {
-        fprintf(stderr, "Error opening file.\n");
-        exit(1);
-    }
-
-    // Skipping the first line (total pairs and size info)
-    fscanf(fh, "%*d %*d\n");
-
-    // Calculate the number of elements to skip
-    int elementsToSkip = pairIndex * 2 * matrixSize * matrixSize;
-
-    // Skipping the unwanted pairs
-    for (int i = 0; i < elementsToSkip; i++) {
-        fscanf(fh, "%*lf");
-    }
-
-    // Read the desired pair of matrices
-    readMatrixPair(fh, matrix1, matrixSize);
-    readMatrixPair(fh, matrix2, matrixSize);
-
-    fclose(fh);
-}
-
-void readMatrixInfo(const char* filename, int* nmats, int* matrixSize) {
-    FILE* fh = fopen(filename, "r");
-    if (fh == NULL) {
-        fprintf(stderr, "Error opening file %s.\n", filename);
-        exit(1);
-    }
-
-    if (fscanf(fh, "%d %d\n", nmats, matrixSize) != 2) {
-        fprintf(stderr, "File format error.\n");
-        fclose(fh);
-        exit(1);
-    }
-
-    fclose(fh);
-}
-
-void *PrintHello(void *threadid)
-{
-   long tid;
-   tid = (long)threadid;
-   printf("Hello World! It's me, thread #%ld!\n", tid);
-   pthread_exit(NULL);
+    return NULL;
 }
 
 int main(void) {
-    pthread_t threads[NUM_THREADS];
+    pthread_t threads[N_THREADS];
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    double **a, **b, **c, **d;
+    double **a, **b, **c;
     int matrixSize;
 
-    int i, j, k;
     int nmats;
-    char *fname = "matrices_dev.dat"; //Change to matrices_large.dat for performance evaluation
+
+    char *fname = "matrices_large.dat"; //Change to matrices_large.dat for performance evaluation
     char newFilename[256]; // Adjust size as needed
 
     printf("Start\n");
 
     readMatrixInfo(fname, &nmats, &matrixSize);
+    int mJobs = nmats;
+
+    Job *jobs = malloc(mJobs * sizeof(Job));
+    if (!jobs) {
+        perror("Failed to allocate memory for jobs");
+        return 1;
+    }
+
+
+    // Initialize jobs
+    for (int i = 0; i < mJobs; ++i) {
+        jobs[i].jobId = i; // Example job initialization
+
+    // Ensure the destination buffer is large enough
+    if (strlen(fname) < sizeof(jobs[i].fname)) {
+        strcpy(jobs[i].fname, fname);
+    } else {
+        fprintf(stderr, "Error: Source filename is too long to copy\n");
+        // Handle the error, perhaps exit or assign a default value
+        exit(1); // or handle as needed
+    }
+
+        jobs[i].pair=i;
+    }
+
+
+    // Prepare shared data
+    ThreadData data;
+    data.jobs = jobs;
+    data.totalJobs = mJobs;
+    data.nextJob = 0;
+    data.mutex = &mutex;
+
+    
+
 
     //Dynamically create matrices of the size needed
     a = allocateMatrix(matrixSize);
     b = allocateMatrix(matrixSize);
     c = allocateMatrix(matrixSize);
-    d = allocateMatrix(matrixSize); // our result
-
-
-
-    int rc;
-    long t;
-    for(t = 0; t < NUM_THREADS; t++) {
-        printf("In main: creating thread %ld\n", t);
-        rc = pthread_create(&threads[t], NULL, PrintHello, (void *)t);
-        if (rc) {
-            printf("ERROR; return code from pthread_create() is %d\n", rc);
-            exit(-1);
-        }
-    }
 
     printf("Loading %d pairs of square matrices of size %d from %s...\n", nmats, matrixSize, fname);
     double **matrixREF;
@@ -218,29 +127,47 @@ int main(void) {
     int equal=0;
     int matsize;
 
-    for(k=0;k<nmats;k++){
-        readSpecificMatrixPair(fname, k, matrixSize, a, b);
+    for(int k=0;k<nmats;k++){
+        matrixSize=readSpecificMatrixPair(fname, k, a, b);
         printf("Multiplying two matrices...\n"); //Remove this line for performance tests
         mm(a, b, c, matrixSize);
         printResult(c,matrixSize); //Remove this line for performance tests
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF.dat");
         writeMatrixToFile(c,matrixSize,newFilename);
-        snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF2.dat");
-        writeMatrixToFile(c,matrixSize,newFilename);
     }
 
+    // Debug worker
+    //coarse_worker(&data);
+
+
+    // Create threads
+    for (int i = 0; i < N_THREADS; ++i) {
+        if (pthread_create(&threads[i], NULL, coarse_worker, &data) != 0) {
+            perror("Failed to create thread");
+            free(jobs);
+            return 1;
+        }
+    }
+
+    // Join threads
+    for (int i = 0; i < N_THREADS; ++i) {
+        pthread_join(threads[i], NULL);
+    }
+
+    free(jobs);
+    pthread_mutex_destroy(&mutex);
 
     // Verification
-    for(k=0;k<nmats;k++){
+    for(int k=0;k<nmats;k++){
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF.dat");
         matsize=readMatrixFromFile(newFilename,&matrixREF);
-        snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF2.dat");
+        snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "COARSE.dat");
         readMatrixFromFile(newFilename,&matrixUS);
         equal=matricesAreEqual(matrixREF,matrixUS,matrixSize);
         if (equal) {
-           printf("The matrices are equal for product %ld from %s.\n",k,fname);
+           printf("The matrices are equal for product %d from %s.\n",k,fname);
         } else {
-            printf("The matrices are not equal for product %ld from %s.\n",k,fname);
+            printf("The matrices are not equal for product %d from %s.\n",k,fname);
         }
     }
 
