@@ -11,6 +11,8 @@ typedef struct {
     char fname[256];
     int pair;
     // Other job-specific data
+    int verbose;
+
 } Job;
 
 typedef struct {
@@ -43,12 +45,17 @@ void *coarse_worker(void *arg) {
         Job job = data->jobs[data->nextJob++];
         pthread_mutex_unlock(data->mutex);
 
-        printf("Thread processing job %d\n", job.jobId);
+        if (job.verbose){
+            printf("Thread processing job %d\n", job.jobId);
+        }
 
         // Process the job...
         readMatrixInfo(job.fname, &nmats, &matrixSize);
 
-        printf("Multiplying two matrices...\n"); //Remove this line for performance tests
+        if (job.verbose){
+            printf("Multiplying two matrices...\n"); //Remove this line for performance tests
+        }
+
         //Dynamically create matrices of the size needed
         a = allocateMatrix(matrixSize);
         b = allocateMatrix(matrixSize);
@@ -88,13 +95,13 @@ int main(int argc, char *argv[]) {
         mode = argv[3];
     }
     if (argc > 4) {
-        verbose = strcmp(argv[4], "True") == 0;
+        verbose = atoi(argv[4]);
     }
 
     printf("Number of threads: %d\n", nThreads);
     printf("Datafile: %s\n", datafile);
     printf("Mode: %s\n", mode);
-    printf("Verbose Mode: %s\n", verbose ? "Enabled" : "Disabled");
+    printf("Verbose Mode: %d\n", verbose);
 
 
     if (verbose){
@@ -108,7 +115,7 @@ int main(int argc, char *argv[]) {
     readMatrixInfo(fname, &nmats, &matrixSize);
 
 
-    if (strcmp(mode,"REF")){
+    if (strcmp(mode,"REF")==0){
         double **a, **b, **c;
         //Dynamically create matrices of the size needed
         a = allocateMatrix(matrixSize);
@@ -141,7 +148,7 @@ int main(int argc, char *argv[]) {
         free(c);
     }
 
-    if (strcmp(mode,"COARSE")){
+    if (strcmp(mode,"COARSE")==0){
         pthread_t threads[nThreads];
         pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -167,6 +174,7 @@ int main(int argc, char *argv[]) {
         }
 
             jobs[i].pair=i;
+            jobs[i].verbose=verbose;
         }
 
         // Prepare shared data
