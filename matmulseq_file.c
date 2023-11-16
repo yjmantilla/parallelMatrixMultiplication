@@ -33,12 +33,6 @@ void *coarse_worker(void *arg) {
         pthread_mutex_lock(data->mutex);
         if (data->nextJob >= data->totalJobs) {
             pthread_mutex_unlock(data->mutex);
-            // free(*a);
-            // free(a);
-            // free(*b);
-            // free(b);
-            // free(*c);
-            // free(c);
             break; // No more jobs to process
         }
 
@@ -66,6 +60,13 @@ void *coarse_worker(void *arg) {
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",job.fname, job.pair, "COARSE.dat");
         writeMatrixToFile(c,matrixSize,newFilename);
     }
+
+    free(*a);
+    free(a);
+    free(*b);
+    free(b);
+    free(*c);
+    free(c);
 
     return NULL;
 }
