@@ -36,4 +36,9 @@ for x in range(1, 33):
     result_file = f"results/results_COARSE_X{x}.csv"
     run_experiment("COARSE", x, N_REPETITIONS, result_file)
 
+# Run experiments for FINE mode with varying X
+for x in range(1, 33):
+    result_file = f"results/results_COARSE_X{x}.csv"
+    run_experiment("FINE", x, N_REPETITIONS, result_file)
+
 print("Experiments completed.")

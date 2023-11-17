@@ -17,11 +17,31 @@ typedef struct {
 } Job;
 
 typedef struct {
+    int jobId;
+    int pair;
+    // Other job-specific data
+    int verbose;
+    int i;
+    int j;
+    double **matrixRefA; // Reference to a matrix (double pointer)
+    double **matrixRefB; // Reference to a matrix (double pointer)
+    double **matrixRefC; // Reference to a matrix (double pointer)
+    int matrixSize;
+} FineJob;
+
+typedef struct {
     Job *jobs;
     int totalJobs;
     int nextJob;
     pthread_mutex_t *mutex;
 } ThreadData;
+
+typedef struct {
+    FineJob *jobs;
+    int totalJobs;
+    int nextJob;
+    pthread_mutex_t *mutex;
+} FineThreadData;
 
 void *coarse_worker(void *arg) {
     ThreadData *data = (ThreadData *)arg;
@@ -72,12 +92,35 @@ void *coarse_worker(void *arg) {
     return NULL;
 }
 
+
+void *fine_worker(void *arg) {
+    FineThreadData *data = (ThreadData *)arg;
+    while (1) {
+        pthread_mutex_lock(data->mutex);
+        if (data->nextJob >= data->totalJobs) {
+            pthread_mutex_unlock(data->mutex);
+            break; // No more jobs to process
+        }
+
+        FineJob job = data->jobs[data->nextJob++];
+        pthread_mutex_unlock(data->mutex);
+
+        if (job.verbose){
+            printf("Thread processing job %d\n", job.jobId);
+        }
+
+        //Dynamically create matrices of the size needed
+        mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize,job.i,job.j);
+    }
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
 
     // Default values
     int defaultNThreads = 4; // Default number of threads
     char *defaultDatafile = "matrices_dev.dat"; // Default data file name
-    char *defaultMode = "REF"; // Default mode
+    char *defaultMode = "FINE"; // Default mode
     int defaultVerbose = 0; // Default verbose mode (disabled)
 
     // Variables to store actual values, initialized to defaults
@@ -172,14 +215,14 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < mJobs; ++i) {
             jobs[i].jobId = i; // Example job initialization
 
-        // Ensure the destination buffer is large enough
-        if (strlen(fname) < sizeof(jobs[i].fname)) {
-            strcpy(jobs[i].fname, fname);
-        } else {
-            fprintf(stderr, "Error: Source filename is too long to copy\n");
-            // Handle the error, perhaps exit or assign a default value
-            exit(1); // or handle as needed
-        }
+            // Ensure the destination buffer is large enough
+            if (strlen(fname) < sizeof(jobs[i].fname)) {
+                strcpy(jobs[i].fname, fname);
+            } else {
+                fprintf(stderr, "Error: Source filename is too long to copy\n");
+                // Handle the error, perhaps exit or assign a default value
+                exit(1); // or handle as needed
+            }
 
             jobs[i].pair=i;
             jobs[i].verbose=verbose;
@@ -211,6 +254,125 @@ int main(int argc, char *argv[]) {
 
         free(jobs);
         pthread_mutex_destroy(&mutex);
+    }
+
+
+    if (strcmp(mode,"FINE")==0){
+        pthread_t threads[nThreads];
+        pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+        int mJobs = nmats*matrixSize*matrixSize;
+
+        FineJob *jobs = malloc(mJobs * sizeof(FineJob));
+        if (!jobs) {
+            perror("Failed to allocate memory for jobs");
+            return 1;
+        }
+
+        // Allocation
+
+        double ***matricesA = (double ***)malloc(nmats * sizeof(double **));
+        double ***matricesB = (double ***)malloc(nmats * sizeof(double **));
+        double ***matricesC = (double ***)malloc(nmats * sizeof(double **));
+
+        if (matricesA == NULL) {
+            perror("Memory allocation failed for matricesA array");
+            exit(1);
+        }
+
+        if (matricesB == NULL) {
+            perror("Memory allocation failed for matricesB array");
+            exit(1);
+        }
+
+        if (matricesC == NULL) {
+            perror("Memory allocation failed for matricesC array");
+            exit(1);
+        }
+
+        // Allocate each matrix
+        for (int i = 0; i < nmats; i++) {
+            matricesA[i] = allocateMatrix(matrixSize);
+            matricesB[i] = allocateMatrix(matrixSize);
+            matricesC[i] = allocateMatrix(matrixSize);
+        }
+
+        // Read Matrices
+        for(int k=0;k<nmats;k++){
+            readSpecificMatrixPair(fname, k, matricesA[k], matricesB[k]);
+        }
+
+        // Initialize jobs
+        int jobNum =0;
+        for (int pair=0; pair < nmats; pair++){
+            for (int i = 0; i < matrixSize; i++) {
+                for (int j = 0; j < matrixSize; j++){
+                    jobs[i].jobId = jobNum; // Example job initialization
+                    jobs[jobNum].pair=pair;
+                    jobs[jobNum].verbose=verbose;
+                    jobs[jobNum].i=i;
+                    jobs[jobNum].j=j;
+                    jobs[jobNum].matrixRefA=matricesA[pair];
+                    jobs[jobNum].matrixRefB=matricesB[pair];
+                    jobs[jobNum].matrixRefC=matricesC[pair];
+                    jobs[jobNum].matrixSize=matrixSize;
+                    jobNum++;
+                }
+            }
+        }
+
+        // Prepare shared data
+        FineThreadData data;
+        data.jobs = jobs;
+        data.totalJobs = mJobs;
+        data.nextJob = 0;
+        data.mutex = &mutex;
+
+        // Debug worker
+        //fine_worker(&data);
+
+        // Create threads
+        for (int i = 0; i < nThreads; ++i) {
+            if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
+                perror("Failed to create thread");
+                free(jobs);
+                return 1;
+            }
+        }
+
+        // Join threads
+        for (int i = 0; i < nThreads; ++i) {
+            pthread_join(threads[i], NULL);
+        }
+
+        //Write Results
+
+        for(int k=0;k<nmats;k++){
+            snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINE.dat");
+            writeMatrixToFile(matricesC[k],matrixSize,newFilename);
+        }
+
+        free(jobs);
+        pthread_mutex_destroy(&mutex);
+
+
+        for (int i = 0; i < nmats; i++) {
+            // Free the contiguous block allocated for each matrix in matricesA, matricesB, and matricesC
+            free(matricesA[i][0]);  // Free the block of matrix elements
+            free(matricesA[i]);     // Free the array of pointers
+
+            free(matricesB[i][0]);  // Repeat for matricesB
+            free(matricesB[i]);
+
+            free(matricesC[i][0]);  // Repeat for matricesC
+            free(matricesC[i]);
+        }
+
+        // Finally, free the top-level arrays of pointers
+        free(matricesA);
+        free(matricesB);
+        free(matricesC);
+
     }
 
     // Stop timing
