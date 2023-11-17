@@ -20,6 +20,11 @@ make
 
 python3 timing_experiments.py
 
+You can setup N_REPETITIONS in the code. This will configure how many times a single file of multiplication pairs is run in a given configuration (in example coarse grained with 4 threads).
+
+The idea is to estimate the timing from more than one measure of the execution time.
+
+
 ### Running individual codes
 
 There are four ways to run the multiplications:

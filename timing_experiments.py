@@ -1,6 +1,14 @@
 import subprocess
 import csv
 import re
+import os
+
+file_path = os.path.realpath(__file__)
+
+# FILE
+DATFILE = 'matrices_large.dat'
+# Number of repetitions for each experiment
+N_REPETITIONS = 1
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
@@ -22,15 +30,14 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
 
         for _ in range(n_repetitions):
             if mode in ['REF','COARSE','FINE']:
-                command = ["./matmulseq_file.o", str(x_val), "matrices_large.dat", mode, "0"]#"time"
+                command = ["./matmulseq_file", str(x_val), DATFILE, mode, "0"]
             else: #mode=PYTHON
-                command = ["/usr/bin/python3", "/home/user/code/parallelMatrixMultiplication/matmulseq_file.py", "/home/user/code/parallelMatrixMultiplication/matrices_dev.dat", "--n_jobs", str(x_val), "--verbose" if mode == "verbose" else ""]
+                command = ["python3", "matmulseq_file.py", os.path.join(os.path.dirname(file_path),DATFILE), "--n_jobs", str(x_val)]
 
             real_time = run_command(command)
             writer.writerow([real_time])
 
-# Number of repetitions for each experiment
-N_REPETITIONS = 1
+
 
 # Run experiments for REF mode
 print('REF')
@@ -47,7 +54,6 @@ for x in range(1, 33):
     print('FINE',x)
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
-
 
 # Run experiments for PYTHON mode with varying X
 for x in range(1, 33):
