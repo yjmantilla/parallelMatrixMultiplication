@@ -21,12 +21,16 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
         writer.writerow(['Time'])  # Header
 
         for _ in range(n_repetitions):
-            command = ["./matmulseq_file.o", str(x_val), "matrices_large.dat", mode, "0"]#"time"
+            if mode in ['REF','COARSE','FINE']:
+                command = ["./matmulseq_file.o", str(x_val), "matrices_large.dat", mode, "0"]#"time"
+            else: #mode=PYTHON
+                command = ["/usr/bin/python3", "/home/user/code/parallelMatrixMultiplication/matmulseq_file.py", "/home/user/code/parallelMatrixMultiplication/matrices_dev.dat", "--n_jobs", str(x_val), "--verbose" if mode == "verbose" else ""]
+
             real_time = run_command(command)
             writer.writerow([real_time])
 
 # Number of repetitions for each experiment
-N_REPETITIONS = 5
+N_REPETITIONS = 1
 
 # Run experiments for REF mode
 print('REF')
@@ -43,5 +47,12 @@ for x in range(1, 33):
     print('FINE',x)
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
+
+
+# Run experiments for PYTHON mode with varying X
+for x in range(1, 33):
+    print('PYTHON',x)
+    result_file = f"results/results_PYTHON_X{x}.csv"
+    run_experiment("PYTHON", x, N_REPETITIONS, result_file)
 
 print("Experiments completed.")
