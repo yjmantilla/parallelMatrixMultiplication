@@ -1,5 +1,7 @@
 from ctypes import CDLL, c_int,cast,addressof,sizeof
-from ctypes import POINTER, c_double, c_int
+from ctypes import POINTER, c_double, c_int, byref
+import numpy as np
+import os
 
 def read_matrix_info(filename):
     with open(filename, 'r') as file:
@@ -30,15 +32,13 @@ def read_matrix_pair(filename, pair_index, matrix_size):
 
     return matrix1, matrix2
 
-# Function to create a C double array from a Python list
-# def create_c_matrix(py_matrix, size):
-#     c_matrix = (POINTER(c_double) * size)()
-#     for i in range(size):
-#         row = (c_double * size)(*py_matrix[i])
-#         c_matrix[i] = cast(row, POINTER(c_double))
-#     return c_matrix
+def create_c_matrix_old(py_matrix, size):
+    """The issue with the first element of result_matrix_a being incorrect (6.94355611453995e-310 instead of 2.0) suggests a problem with how the memory is addressed or cast in the create_c_matrix function. This might be caused by an incorrect offset calculation for the start of each row.
+    Let's try a different approach to allocate and set up the c_matrix:
 
-def create_c_matrix(py_matrix, size):
+    Updated create_c_matrix Function Using numpy
+    We can use numpy to create the contiguous block of memory and then set up the c_matrix using numpy's ability to interface with C arrays. numpy arrays ensure proper memory management and alignment, which can help avoid issues with raw pointer arithmetic.
+    """
     # Allocate a contiguous block for matrix data
     data = (c_double * (size * size))(*[elem for row in py_matrix for elem in row])
     
@@ -48,7 +48,30 @@ def create_c_matrix(py_matrix, size):
         row_pointer = cast(addressof(data) + i * size * sizeof(c_double), POINTER(c_double))
         c_matrix[i] = row_pointer
 
-    return c_matrix
+    return c_matrix,None
+
+def create_c_matrix(py_matrix, size):
+    # Create a numpy array with the matrix data
+    np_matrix = np.array(py_matrix, dtype=c_double, order='C')
+
+    # Create an array of pointers to the rows of the numpy array
+    c_matrix = (POINTER(c_double) * size)()
+    for i in range(size):
+        c_matrix[i] = np_matrix[i].ctypes.data_as(POINTER(c_double))
+
+    return c_matrix, np_matrix  # Return both to keep numpy array in scope
+
+def write_matrix_to_file(matrix, size, filename):
+    # Open the file for writing
+    with open(filename, 'w') as file:
+        # Write the size of the matrix at the beginning of the file
+        file.write(f"{size}\n")
+
+        # Write the matrix
+        for i in range(size):
+            for j in range(size):
+                file.write(f"{matrix[i][j]} ")
+            file.write("\n")
 
 
 # Load the shared library
@@ -57,35 +80,32 @@ mylib.mm.argtypes = [POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), POI
 mylib.mm.restype = None
 
 # Main execution
-filename = "/home/user/code/parallelMatrixMultiplication/matrices_dev.dat"
+filename = "/home/user/code/parallelMatrixMultiplication/matrices_large.dat"
 nmats, matrix_size = read_matrix_info(filename)
-
+verbose=False
 for pair in range(nmats):
     matrix_a, matrix_b = read_matrix_pair(filename, pair, matrix_size)
     matrix_c = [[0.0 for _ in range(matrix_size)] for _ in range(matrix_size)]
 
+
+    matrix_a, matrix_b = read_matrix_pair(filename, pair, matrix_size)
+
     # Convert Python matrices to C matrices
-    c_matrix_a = create_c_matrix(matrix_a, matrix_size)
-    c_matrix_b = create_c_matrix(matrix_b, matrix_size)
-    c_matrix_c = create_c_matrix(matrix_c, matrix_size)
+    c_matrix_a,np_matrix_a = create_c_matrix(matrix_a, matrix_size)
+    c_matrix_b,np_matrix_b = create_c_matrix(matrix_b, matrix_size)
+    c_matrix_c,np_matrix_c = create_c_matrix(matrix_c, matrix_size)
 
-    # Debugging: Print a few elements of the C matrices
-    print("C Matrix A[0][0]:", c_matrix_a[0][0])
-    print("C Matrix B[0][0]:", c_matrix_b[0][0])
-    print("C Matrix C[0][0]:", c_matrix_c[0][0])
+    # Check correct allocation and reference
+    if verbose:
+        for pointer_mat in [c_matrix_a,c_matrix_b]:
+            pointer_matrix = [[pointer_mat[i][j] for j in range(matrix_size)] for i in range(matrix_size)]
+            print(pointer_matrix)
 
-
-    print("Matrix A before mm:", matrix_a)
-    print("Matrix B before mm:", matrix_b)
     mylib.mm(c_matrix_a, c_matrix_b, c_matrix_c, matrix_size)
     result_matrix_c = [[c_matrix_c[i][j] for j in range(matrix_size)] for i in range(matrix_size)]
-    print("Matrix C after mm:", result_matrix_c)
 
-    # # Call the C function
-    # mylib.mm(c_matrix_a, c_matrix_b, c_matrix_c, matrix_size)
-    # print(matrix_a)
-    # print(matrix_b)
-    # print(matrix_c)
+    fname=os.path.basename(filename)
+    dname=os.path.dirname(filename)
+    new_filename = f"{dname}/results/{fname}.result.{pair}.PYTHON.dat"
+    write_matrix_to_file(result_matrix_c, matrix_size, new_filename)
 
-    # # matrix_c now contains the result of the matrix multiplication
-    # # Process matrix_c as needed, e.g., print or save to file

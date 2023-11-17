@@ -13,6 +13,8 @@ Puede ser una funcion del codigo.
 
 ## Instructions
 
+install numpy
+
 ./verify.o matrices_large.dat REF COARSE
 
 ### Python
