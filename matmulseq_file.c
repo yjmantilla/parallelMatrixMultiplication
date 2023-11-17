@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <string.h>
 #include "aux_matrix_operations.h"
+#include <time.h>
 
 typedef struct {
     int jobId;
@@ -116,6 +117,12 @@ int main(int argc, char *argv[]) {
     readMatrixInfo(fname, &nmats, &matrixSize);
 
 
+    struct timespec start, end;
+    double elapsed;
+
+    // Start timing
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     if (strcmp(mode,"REF")==0){
         double **a, **b, **c;
         //Dynamically create matrices of the size needed
@@ -206,6 +213,14 @@ int main(int argc, char *argv[]) {
         pthread_mutex_destroy(&mutex);
     }
 
+    // Stop timing
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    // Calculate elapsed time in seconds
+    elapsed = end.tv_sec - start.tv_sec;
+    elapsed += (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+    printf("Elapsed time: %.3f seconds\n", elapsed);
 
     if (verbose){
         printf("Done.\n");
