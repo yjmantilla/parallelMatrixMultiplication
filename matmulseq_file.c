@@ -261,6 +261,77 @@ int main(int argc, char *argv[]) {
         pthread_t threads[nThreads];
         pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+        //START
+        double **a, **b, **c;
+        //Dynamically create matrices of the size needed
+        a = allocateMatrix(matrixSize);
+        b = allocateMatrix(matrixSize);
+        c = allocateMatrix(matrixSize);
+
+        for(int k=0;k<nmats;k++){
+            matrixSize=readSpecificMatrixPair(fname, k, a, b);
+            int mJobs = matrixSize*matrixSize;
+
+            FineJob *jobs = malloc(mJobs * sizeof(FineJob));
+            if (!jobs) {
+                perror("Failed to allocate memory for jobs");
+                return 1;
+            }
+
+            // Initialize jobs
+            int jobNum =0;
+            for (int i = 0; i < matrixSize; i++) {
+                for (int j = 0; j < matrixSize; j++){
+                    jobs[i].jobId = jobNum; // Example job initialization
+                    jobs[jobNum].pair=k;
+                    jobs[jobNum].verbose=verbose;
+                    jobs[jobNum].i=i;
+                    jobs[jobNum].j=j;
+                    jobs[jobNum].matrixRefA=a;
+                    jobs[jobNum].matrixRefB=b;
+                    jobs[jobNum].matrixRefC=c;
+                    jobs[jobNum].matrixSize=matrixSize;
+                    jobNum++;
+                }
+            }
+
+            // Prepare shared data
+            FineThreadData data;
+            data.jobs = jobs;
+            data.totalJobs = mJobs;
+            data.nextJob = 0;
+            data.mutex = &mutex;
+
+            // Debug worker
+            //fine_worker(&data);
+
+            // Create threads
+            for (int i = 0; i < nThreads; ++i) {
+                if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
+                    perror("Failed to create thread");
+                    free(jobs);
+                    return 1;
+                }
+            }
+
+            // Join threads
+            for (int i = 0; i < nThreads; ++i) {
+                pthread_join(threads[i], NULL);
+            }
+
+            snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINE.dat");
+            writeMatrixToFile(c,matrixSize,newFilename);
+        }
+        // Free memory
+        free(*a);
+        free(a);
+        free(*b);
+        free(b);
+        free(*c);
+        free(c);
+
+        //END
+        /*
         int mJobs = nmats*matrixSize*matrixSize;
 
         FineJob *jobs = malloc(mJobs * sizeof(FineJob));
@@ -372,7 +443,7 @@ int main(int argc, char *argv[]) {
         free(matricesA);
         free(matricesB);
         free(matricesC);
-
+    */
     }
 
     // Stop timing
