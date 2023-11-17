@@ -26,7 +26,7 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
             writer.writerow([real_time])
 
 # Number of repetitions for each experiment
-N_REPETITIONS = 5
+N_REPETITIONS = 20
 
 # Run experiments for REF mode
 print('REF')
