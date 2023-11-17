@@ -17,8 +17,8 @@ typedef struct {
 } Job;
 
 typedef struct {
-    int jobId;
-    int pair;
+    //int jobId;
+    //int pair;
     // Other job-specific data
     int verbose;
     int i;
@@ -105,11 +105,6 @@ void *fine_worker(void *arg) {
         FineJob job = data->jobs[data->nextJob++];
         pthread_mutex_unlock(data->mutex);
 
-        if (job.verbose){
-            printf("Thread processing job %d\n", job.jobId);
-        }
-
-        //Dynamically create matrices of the size needed
         mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize,job.i,job.j);
     }
     return NULL;
@@ -119,7 +114,7 @@ int main(int argc, char *argv[]) {
 
     // Default values
     int defaultNThreads = 4; // Default number of threads
-    char *defaultDatafile = "matrices_dev.dat"; // Default data file name
+    char *defaultDatafile = "matrices_large.dat"; // Default data file name
     char *defaultMode = "FINE"; // Default mode
     int defaultVerbose = 0; // Default verbose mode (disabled)
 
@@ -268,42 +263,46 @@ int main(int argc, char *argv[]) {
         b = allocateMatrix(matrixSize);
         c = allocateMatrix(matrixSize);
 
+        matrixSize=readSpecificMatrixPair(fname, 0, a, b);
+        int mJobs = matrixSize*matrixSize;
+
+        FineJob *jobs = malloc(mJobs * sizeof(FineJob));
+        if (!jobs) {
+            perror("Failed to allocate memory for jobs");
+            return 1;
+        }
+
+        // Initialize jobs
+        int jobNum =0;
+        for (int i = 0; i < matrixSize; i++) {
+            for (int j = 0; j < matrixSize; j++){
+                jobs[jobNum].verbose=verbose;
+                jobs[jobNum].i=i;
+                jobs[jobNum].j=j;
+                jobs[jobNum].matrixRefA=a;
+                jobs[jobNum].matrixRefB=b;
+                jobs[jobNum].matrixRefC=c;
+                jobs[jobNum].matrixSize=matrixSize;
+                jobNum++;
+            }
+        }
+
+
+        // Prepare shared data
+        FineThreadData data;
+        data.jobs = jobs;
+        data.totalJobs = mJobs;
+        data.nextJob = 0;
+        data.mutex = &mutex;
+
+        // Debug worker
+        //fine_worker(&data);
+
+
+
         for(int k=0;k<nmats;k++){
             matrixSize=readSpecificMatrixPair(fname, k, a, b);
-            int mJobs = matrixSize*matrixSize;
-
-            FineJob *jobs = malloc(mJobs * sizeof(FineJob));
-            if (!jobs) {
-                perror("Failed to allocate memory for jobs");
-                return 1;
-            }
-
-            // Initialize jobs
-            int jobNum =0;
-            for (int i = 0; i < matrixSize; i++) {
-                for (int j = 0; j < matrixSize; j++){
-                    jobs[i].jobId = jobNum; // Example job initialization
-                    jobs[jobNum].pair=k;
-                    jobs[jobNum].verbose=verbose;
-                    jobs[jobNum].i=i;
-                    jobs[jobNum].j=j;
-                    jobs[jobNum].matrixRefA=a;
-                    jobs[jobNum].matrixRefB=b;
-                    jobs[jobNum].matrixRefC=c;
-                    jobs[jobNum].matrixSize=matrixSize;
-                    jobNum++;
-                }
-            }
-
-            // Prepare shared data
-            FineThreadData data;
-            data.jobs = jobs;
-            data.totalJobs = mJobs;
-            data.nextJob = 0;
-            data.mutex = &mutex;
-
-            // Debug worker
-            //fine_worker(&data);
+            data.nextJob=0;
 
             // Create threads
             for (int i = 0; i < nThreads; ++i) {
