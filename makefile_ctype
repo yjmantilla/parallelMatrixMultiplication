@@ -1,0 +1,26 @@
+# Makefile for aux_matrix_operations
+
+# Compiler and flags
+CC = gcc
+CFLAGS = -fPIC -Wall -shared
+
+# Target library
+LIB = libaux_matrix_operations.so
+
+# Source and header files
+SRC = aux_matrix_operations.c
+HEADER = aux_matrix_operations.h
+
+# Default target
+all: $(LIB)
+
+# Rule to create the shared library
+$(LIB): $(SRC) $(HEADER)
+	$(CC) $(CFLAGS) -o $(LIB) $(SRC)
+
+# Clean up
+clean:
+	rm -f $(LIB)
+
+# Phony targets
+.PHONY: all clean

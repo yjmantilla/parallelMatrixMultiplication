@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
         mode1 = argv[2];
     }
     if (argc > 3) {
-        mode1 = argv[3];
+        mode2 = argv[3];
     }
     printf("Datafile: %s\n", datafile);
     printf("Mode1: %s\n", mode1);

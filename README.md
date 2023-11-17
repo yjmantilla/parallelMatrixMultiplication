@@ -10,3 +10,11 @@ No tirarse la semantica de los calculos que tenmos que hacer por race conditions
 
 Puede ser una funcion del codigo.
 
+
+## Instructions
+
+./verify.o matrices_large.dat REF COARSE
+
+### Python
+
+1. make -f makefile_ctype
