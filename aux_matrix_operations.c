@@ -57,15 +57,20 @@ void mm(double **a, double **b, double **c, int matrixSize) {
 
 void mmSingle(double **a, double **b, double **c, int matrixSize, int i, int j) {
     int k;
-    double sum;
+    double sumA;
+    double sumB;
 
     // Single dot product
-    sum = 0.0;
+    sumA = 0.0;
+    sumB = 0.0;
     // dot product
     for (k = 0; k < matrixSize; k++) {
-        sum += a[i][k] * b[k][j];
+        sumA += a[i][k] * b[k][j];
+        sumB += a[j][k] * b[k][i];
     }
-    c[i][j] = sum; // there shouldnt be race conditions as each thread touches a different position...
+    c[i][j] = sumA; // there shouldnt be race conditions as each thread touches a different position...
+    c[j][i] = sumB;
+
 }
 
 void printResult(double **matrix, int size) {

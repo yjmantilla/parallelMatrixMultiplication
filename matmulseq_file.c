@@ -256,7 +256,15 @@ int main(int argc, char *argv[]) {
         pthread_t threads[nThreads];
         pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-        int mJobs = nmats*matrixSize*matrixSize;
+        //START
+        double **a, **b, **c;
+        //Dynamically create matrices of the size needed
+        a = allocateMatrix(matrixSize);
+        b = allocateMatrix(matrixSize);
+        c = allocateMatrix(matrixSize);
+
+        matrixSize=readSpecificMatrixPair(fname, 0, a, b);
+        int mJobs = matrixSize*(matrixSize+1)/2;
 
         FineJob *jobs = malloc(mJobs * sizeof(FineJob));
         if (!jobs) {
@@ -264,57 +272,21 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        // Allocation
-
-        double ***matricesA = (double ***)malloc(nmats * sizeof(double **));
-        double ***matricesB = (double ***)malloc(nmats * sizeof(double **));
-        double ***matricesC = (double ***)malloc(nmats * sizeof(double **));
-
-        if (matricesA == NULL) {
-            perror("Memory allocation failed for matricesA array");
-            exit(1);
-        }
-
-        if (matricesB == NULL) {
-            perror("Memory allocation failed for matricesB array");
-            exit(1);
-        }
-
-        if (matricesC == NULL) {
-            perror("Memory allocation failed for matricesC array");
-            exit(1);
-        }
-
-        // Allocate each matrix
-        for (int i = 0; i < nmats; i++) {
-            matricesA[i] = allocateMatrix(matrixSize);
-            matricesB[i] = allocateMatrix(matrixSize);
-            matricesC[i] = allocateMatrix(matrixSize);
-        }
-
-        // Read Matrices
-        for(int k=0;k<nmats;k++){
-            readSpecificMatrixPair(fname, k, matricesA[k], matricesB[k]);
-        }
-
         // Initialize jobs
         int jobNum =0;
-        for (int pair=0; pair < nmats; pair++){
-            for (int i = 0; i < matrixSize; i++) {
-                for (int j = 0; j < matrixSize; j++){
-                    jobs[i].jobId = jobNum; // Example job initialization
-                    jobs[jobNum].pair=pair;
-                    jobs[jobNum].verbose=verbose;
-                    jobs[jobNum].i=i;
-                    jobs[jobNum].j=j;
-                    jobs[jobNum].matrixRefA=matricesA[pair];
-                    jobs[jobNum].matrixRefB=matricesB[pair];
-                    jobs[jobNum].matrixRefC=matricesC[pair];
-                    jobs[jobNum].matrixSize=matrixSize;
-                    jobNum++;
-                }
+        for (int i = 0; i < matrixSize; i++) {
+            for (int j = i; j < matrixSize; j++){
+                jobs[jobNum].verbose=verbose;
+                jobs[jobNum].i=i;
+                jobs[jobNum].j=j;
+                jobs[jobNum].matrixRefA=a;
+                jobs[jobNum].matrixRefB=b;
+                jobs[jobNum].matrixRefC=c;
+                jobs[jobNum].matrixSize=matrixSize;
+                jobNum++;
             }
         }
+
 
         // Prepare shared data
         FineThreadData data;
@@ -326,48 +298,36 @@ int main(int argc, char *argv[]) {
         // Debug worker
         //fine_worker(&data);
 
-        // Create threads
-        for (int i = 0; i < nThreads; ++i) {
-            if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
-                perror("Failed to create thread");
-                free(jobs);
-                return 1;
-            }
-        }
 
-        // Join threads
-        for (int i = 0; i < nThreads; ++i) {
-            pthread_join(threads[i], NULL);
-        }
-
-        //Write Results
 
         for(int k=0;k<nmats;k++){
+            matrixSize=readSpecificMatrixPair(fname, k, a, b);
+            data.nextJob=0;
+
+            // Create threads
+            for (int i = 0; i < nThreads; ++i) {
+                if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
+                    perror("Failed to create thread");
+                    free(jobs);
+                    return 1;
+                }
+            }
+
+            // Join threads
+            for (int i = 0; i < nThreads; ++i) {
+                pthread_join(threads[i], NULL);
+            }
+
             snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINE.dat");
-            writeMatrixToFile(matricesC[k],matrixSize,newFilename);
+            writeMatrixToFile(c,matrixSize,newFilename);
         }
-
-        free(jobs);
-        pthread_mutex_destroy(&mutex);
-
-
-        for (int i = 0; i < nmats; i++) {
-            // Free the contiguous block allocated for each matrix in matricesA, matricesB, and matricesC
-            free(matricesA[i][0]);  // Free the block of matrix elements
-            free(matricesA[i]);     // Free the array of pointers
-
-            free(matricesB[i][0]);  // Repeat for matricesB
-            free(matricesB[i]);
-
-            free(matricesC[i][0]);  // Repeat for matricesC
-            free(matricesC[i]);
-        }
-
-        // Finally, free the top-level arrays of pointers
-        free(matricesA);
-        free(matricesB);
-        free(matricesC);
-
+        // Free memory
+        free(*a);
+        free(a);
+        free(*b);
+        free(b);
+        free(*c);
+        free(c);
         //END
         /*
         int mJobs = nmats*matrixSize*matrixSize;
