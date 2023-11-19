@@ -167,23 +167,24 @@ typedef struct {
 
 
 void *fineHungry_worker(void *arg) {
-    FineThreadData *data = (ThreadData *)arg;
+    FineHungryThreadData *data = (FineHungryThreadData *)arg;
     while (1) {
         pthread_mutex_lock(data->mutex);
         if (data->nextJob >= data->totalJobs) {
             pthread_mutex_unlock(data->mutex);
-            break; // No more jobs to process
+            break;
         }
 
-        FineJob job = data->jobs[data->nextJob++];
+        FineHungryJob *job = &data->jobs[data->nextJob];
+        data->nextJob++;
         pthread_mutex_unlock(data->mutex);
 
-        if (job.verbose){
-            printf("Thread processing job %d\n", job.jobId);
+        if (job->verbose){
+            printf("Thread processing job %d\n", job->jobId);
         }
 
-        //Dynamically create matrices of the size needed
-        mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize,job.i,job.j);
+        // Process the job...
+        mmSingle(job->matrixRefA, job->matrixRefB, job->matrixRefC, job->matrixSize, job->i, job->j);
     }
     return NULL;
 }
@@ -450,7 +451,10 @@ int main(int argc, char *argv[]) {
         //END
     }
     if (strcmp(mode,"FINEHUNGRY")==0){
-        pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+        pthread_mutex_t mutex;
+        pthread_mutex_init(&mutex, NULL);
+
         int mJobs = nmats*matrixSize*(matrixSize+1)/2;
 
         FineHungryJob *jobs = malloc(mJobs * sizeof(FineHungryJob));
@@ -541,7 +545,6 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < nThreads; ++i) {
             pthread_join(threads[i], NULL);
         }
-
         //Write Results
 
         for(int k=0;k<nmats;k++){
@@ -550,9 +553,6 @@ int main(int argc, char *argv[]) {
         }
 
         free(jobs);
-        pthread_mutex_destroy(&mutex);
-
-
         for (int i = 0; i < nmats; i++) {
             // Free the contiguous block allocated for each matrix in matricesA, matricesB, and matricesC
             free(matricesA[i][0]);  // Free the block of matrix elements
@@ -569,7 +569,7 @@ int main(int argc, char *argv[]) {
         free(matricesA);
         free(matricesB);
         free(matricesC);
-    
+        pthread_mutex_destroy(&mutex);
     }
 
     // Stop timing
