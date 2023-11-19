@@ -36,7 +36,7 @@ def plot_boxplots(data_frames, output_folder):
     plt.figure(figsize=(10, 6))
     sns.boxplot(data=ref_df, palette=cmap)
     plt.title('Boxplot for REF Method')
-    plt.ylabel('Time (secs)')
+    plt.ylabel('Execution Time (secs)')
     plt.savefig(os.path.join(output_folder, 'boxplot_ref.png'))
 
     # Individual Boxplots for Each Method
@@ -48,7 +48,7 @@ def plot_boxplots(data_frames, output_folder):
         sns.boxplot(x="T", y="Time", data=combined, hue="T", palette=cmap, legend=False)
         plt.title(f'{method} Method Boxplot by Number of Threads')
         plt.xlabel('Number of Threads (T)')
-        plt.ylabel('Time (secs)')
+        plt.ylabel('Execution Time (secs)')
         plt.savefig(os.path.join(output_folder, f'boxplot_{method}.png'))
 
     # Best T Comparison Boxplot
@@ -65,10 +65,30 @@ def plot_boxplots(data_frames, output_folder):
     sns.boxplot(x="Method", y="Time", data=combined_best_df, palette=cmap)
     plt.title('Comparison of Best T for Each Method Including REF')
     plt.xlabel('Method')
-    plt.ylabel('Time (secs)')
+    plt.ylabel('Execution Time (secs)')
     plt.savefig(os.path.join(output_folder, 'best_t_comparison.png'))
 
 # Rest of your script remains the same
+def plot_mean_time_vs_t(data_frames, output_folder):
+    plt.figure(figsize=(12, 8))
+    methods = ['COARSE', 'FINE', 'FINEHUNGRY', 'PYTHON']
+
+    # Plotting mean times for each method
+    for method in methods:
+        dfs = {key: df for key, df in data_frames.items() if method in key}
+        combined = combine_dfs_with_t(dfs)
+        means = combined.groupby('T')['Time'].mean()
+        sns.lineplot(x=means.index, y=means.values, label=method)
+
+    # Plotting REF as a constant line
+    ref_mean = data_frames['results_REF']['Time'].mean()
+    plt.axhline(y=ref_mean, color='gray', linestyle='--', label='REF')
+
+    plt.title('Mean Time vs. Number of Threads (T) for Each Method')
+    plt.xlabel('Number of Threads (T)')
+    plt.ylabel('Mean Execution Time (secs)')
+    plt.legend()
+    plt.savefig(os.path.join(output_folder, 'mean_time_vs_t.png'))
 
 def main(folder_path):
     data_frames = read_data(folder_path)
@@ -76,6 +96,7 @@ def main(folder_path):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     plot_boxplots(data_frames, output_folder)
+    plot_mean_time_vs_t(data_frames, output_folder)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
