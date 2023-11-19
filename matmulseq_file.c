@@ -89,20 +89,9 @@ void *coarse_worker(void *arg) {
 
         matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b);
 
-        // //Dynamically create matrices of the size needed
-        // a = allocateMatrix(matrixSize);
-        // b = allocateMatrix(matrixSize);
-        // c = allocateMatrix(matrixSize);
-
         mm(a, b, c, matrixSize);
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",job.fname, job.pair, "COARSE.dat");
         writeMatrixToFile(c,matrixSize,newFilename);
-        // free(*a);
-        // free(a);
-        // free(*b);
-        // free(b);
-        // free(*c);
-        // free(c);
     }
 
     free(*a);
