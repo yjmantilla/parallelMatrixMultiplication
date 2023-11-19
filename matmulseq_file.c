@@ -143,6 +143,51 @@ void *fine_worker(void *arg) {
     return NULL;
 }
 
+
+typedef struct {
+    int jobId;
+    int pair;
+    // Other job-specific data
+    int verbose;
+    int i;
+    int j;
+    double **matrixRefA; // Reference to a matrix (double pointer)
+    double **matrixRefB; // Reference to a matrix (double pointer)
+    double **matrixRefC; // Reference to a matrix (double pointer)
+    int matrixSize;
+} FineHungryJob;
+
+typedef struct {
+    int totalJobs;
+    int nextJob;
+    int jobsCompleted;
+    FineJob *jobs;
+    pthread_mutex_t *mutex;
+} FineHungryThreadData;
+
+
+void *fineHungry_worker(void *arg) {
+    FineThreadData *data = (ThreadData *)arg;
+    while (1) {
+        pthread_mutex_lock(data->mutex);
+        if (data->nextJob >= data->totalJobs) {
+            pthread_mutex_unlock(data->mutex);
+            break; // No more jobs to process
+        }
+
+        FineJob job = data->jobs[data->nextJob++];
+        pthread_mutex_unlock(data->mutex);
+
+        if (job.verbose){
+            printf("Thread processing job %d\n", job.jobId);
+        }
+
+        //Dynamically create matrices of the size needed
+        mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize,job.i,job.j);
+    }
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
 
     // Default values
@@ -403,14 +448,22 @@ int main(int argc, char *argv[]) {
         pthread_mutex_destroy(&mutex);
         pthread_cond_destroy(&jobAvailableCond);
         //END
-        /*
-        int mJobs = nmats*matrixSize*matrixSize;
+    }
+    if (strcmp(mode,"FINEHUNGRY")==0){
+        pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+        int mJobs = nmats*matrixSize*(matrixSize+1)/2;
 
-        FineJob *jobs = malloc(mJobs * sizeof(FineJob));
+        FineHungryJob *jobs = malloc(mJobs * sizeof(FineHungryJob));
         if (!jobs) {
             perror("Failed to allocate memory for jobs");
             return 1;
         }
+
+        if (nThreads > mJobs){
+            nThreads = mJobs;
+        }
+
+        pthread_t threads[nThreads];
 
         // Allocation
 
@@ -449,7 +502,7 @@ int main(int argc, char *argv[]) {
         int jobNum =0;
         for (int pair=0; pair < nmats; pair++){
             for (int i = 0; i < matrixSize; i++) {
-                for (int j = 0; j < matrixSize; j++){
+                for (int j = i; j < matrixSize; j++){
                     jobs[i].jobId = jobNum; // Example job initialization
                     jobs[jobNum].pair=pair;
                     jobs[jobNum].verbose=verbose;
@@ -465,18 +518,19 @@ int main(int argc, char *argv[]) {
         }
 
         // Prepare shared data
-        FineThreadData data;
+        FineHungryThreadData data;
         data.jobs = jobs;
         data.totalJobs = mJobs;
         data.nextJob = 0;
         data.mutex = &mutex;
+        // this are not used in this mode though
 
         // Debug worker
         //fine_worker(&data);
 
         // Create threads
         for (int i = 0; i < nThreads; ++i) {
-            if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
+            if (pthread_create(&threads[i], NULL, fineHungry_worker, &data) != 0) {
                 perror("Failed to create thread");
                 free(jobs);
                 return 1;
@@ -491,7 +545,7 @@ int main(int argc, char *argv[]) {
         //Write Results
 
         for(int k=0;k<nmats;k++){
-            snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINE.dat");
+            snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINEHUNGRY.dat");
             writeMatrixToFile(matricesC[k],matrixSize,newFilename);
         }
 
@@ -515,7 +569,7 @@ int main(int argc, char *argv[]) {
         free(matricesA);
         free(matricesB);
         free(matricesC);
-    */
+    
     }
 
     // Stop timing

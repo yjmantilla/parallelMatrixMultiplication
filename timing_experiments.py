@@ -8,7 +8,7 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 1
+N_REPETITIONS = 5
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
@@ -54,6 +54,13 @@ for x in range(1, 33):
     print('FINE',x)
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
+
+
+# Run experiments for FINE mode with varying X
+for x in range(1, 33):
+    print('FINEHUNGRY',x)
+    result_file = f"results/results_FINEHUNGRY_X{x}.csv"
+    run_experiment("FINEHUNGRY", x, N_REPETITIONS, result_file)
 
 # Run experiments for PYTHON mode with varying X
 for x in range(1, 33):
