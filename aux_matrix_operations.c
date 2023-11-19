@@ -16,8 +16,8 @@ double **allocateMatrix(int size) {
     int i;
     double *vals, **temp;
 
-    // allocate space for values of a matrix
-    vals = (double *) malloc(size * size * sizeof(double));
+    // allocate space for values of a matrix and initialize to zero
+    vals = (double *) calloc(size * size, sizeof(double));
     if (vals == NULL) {
         fprintf(stderr, "Memory allocation failed for matrix values\n");
         exit(1);
@@ -31,11 +31,13 @@ double **allocateMatrix(int size) {
         exit(1);
     }
 
-    for (i = 0; i < size; i++)
+    for (i = 0; i < size; i++) {
         temp[i] = &vals[i * size];
+    }
 
     return temp;
 }
+
 
 
 void mm(double **a, double **b, double **c, int matrixSize) {
