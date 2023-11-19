@@ -44,19 +44,17 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
 print('REF')
 run_experiment("REF", 1, N_REPETITIONS, "results/results_REF.csv")
 
-if False:
-    # Run experiments for COARSE mode with varying X
-    for x in range(1, 33):
-        print('COARSE',x)
-        result_file = f"results/results_COARSE_X{x}.csv"
-        run_experiment("COARSE", x, N_REPETITIONS, result_file)
+# Run experiments for COARSE mode with varying X
+for x in range(1, 33):
+    print('COARSE',x)
+    result_file = f"results/results_COARSE_X{x}.csv"
+    run_experiment("COARSE", x, N_REPETITIONS, result_file)
 
-    # Run experiments for FINE mode with varying X
-    for x in range(1, 33):
-        print('FINE',x)
-        result_file = f"results/results_FINE_X{x}.csv"
-        run_experiment("FINE", x, N_REPETITIONS, result_file)
-
+# Run experiments for FINE mode with varying X
+for x in range(1, 33):
+    print('FINE',x)
+    result_file = f"results/results_FINE_X{x}.csv"
+    run_experiment("FINE", x, N_REPETITIONS, result_file)
 
 # Run experiments for FINE mode with varying X
 for x in range(1, 33):
