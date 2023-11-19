@@ -17,18 +17,6 @@ typedef struct {
 
 } Job;
 
-typedef struct {
-    int jobId;
-    int pair;
-    // Other job-specific data
-    int verbose;
-    int i;
-    int j;
-    double **matrixRefA; // Reference to a matrix (double pointer)
-    double **matrixRefB; // Reference to a matrix (double pointer)
-    double **matrixRefC; // Reference to a matrix (double pointer)
-    int matrixSize;
-} FineJob;
 
 typedef struct {
     Job *jobs;
@@ -36,17 +24,6 @@ typedef struct {
     int nextJob;
     pthread_mutex_t *mutex;
 } ThreadData;
-
-typedef struct {
-    pthread_mutex_t *mutex;
-    pthread_cond_t *jobAvailableCond;
-    pthread_cond_t *jobsDoneCond;
-    FineJob *jobs;
-    int totalJobs;
-    int nextJob;
-    int jobsCompleted;
-    bool terminate;
-} FineThreadData;
 
 void *coarse_worker(void *arg) {
     ThreadData *data = (ThreadData *)arg;
@@ -105,46 +82,73 @@ void *coarse_worker(void *arg) {
 }
 
 
+typedef struct {
+    int jobId;
+    int pair;
+    // Other job-specific data
+    int verbose;
+    int i;
+    int j;
+    double **matrixRefA; // Reference to a matrix (double pointer)
+    double **matrixRefB; // Reference to a matrix (double pointer)
+    double **matrixRefC; // Reference to a matrix (double pointer)
+    int matrixSize;
+} FineJob;
+
+typedef struct {
+    int totalJobs;
+    int nextJob;
+    int jobsCompleted;
+    bool terminate;
+    FineJob *jobs;
+    pthread_cond_t *jobAvailableCond;
+    pthread_mutex_t *mutex;
+} FineThreadData;
+
+
 void *fine_worker(void *arg) {
     FineThreadData *data = (FineThreadData *)arg;
 
     while (1) {
         pthread_mutex_lock(data->mutex);
+
+        // Wait while there are no jobs and the thread should not terminate
+        while (data->nextJob >= data->totalJobs && !data->terminate) {
+            // jobCompleted should be greaater == to totalJobs here
+            pthread_cond_wait(data->jobAvailableCond, data->mutex);
+        }
+
+        // Break the loop if the thread should terminate
         if (data->terminate) {
             pthread_mutex_unlock(data->mutex);
             break;
         }
-        if (data->nextJob >= data->totalJobs) {
-            pthread_cond_wait(data->jobAvailableCond, data->mutex);
-        }
 
-        FineJob job = data->jobs[data->nextJob];
-        data->nextJob +=1;
+        // Get the job and increment the nextJob index
+        FineJob job = data->jobs[data->nextJob++];
         pthread_mutex_unlock(data->mutex);
 
-        // if (job.i==0 && job.j==0){
-        //     printf("stop\n");
-        // }
-        // Process the job...
+        // Process the job
         mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize, job.i, job.j);
 
         pthread_mutex_lock(data->mutex);
         data->jobsCompleted++;
+
+        // Signal that all jobs are done if this is the last job
         if (data->jobsCompleted == data->totalJobs) {
-            pthread_cond_signal(data->jobsDoneCond);
+            ;
         }
         pthread_mutex_unlock(data->mutex);
     }
     return NULL;
 }
 
-
 int main(int argc, char *argv[]) {
 
     // Default values
     int defaultNThreads = 1; // Default number of threads
-    char *defaultDatafile = "matrices_large.dat"; // Default data file name
-    char *defaultMode = "FINE"; // Default mode
+    char defaultDatafile[256] = "matrices_dev.dat"; // Default data file name
+    char defaultMode[20] = "FINE"; // Default mode
     int defaultVerbose = 0; // Default verbose mode (disabled)
 
     // Variables to store actual values, initialized to defaults
@@ -286,16 +290,13 @@ int main(int argc, char *argv[]) {
 
 
     if (strcmp(mode,"FINE")==0){
-        pthread_t threads[nThreads];
         pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-        pthread_cond_t jobsDoneCond = PTHREAD_COND_INITIALIZER;
-        //START
-        double **a, **b, **c;
-        //Dynamically create matrices of the size needed
-        a = allocateMatrix(matrixSize);
-        b = allocateMatrix(matrixSize);
-        c = allocateMatrix(matrixSize);
 
+        // Allocate matrices outside of the worker threads
+        double **a = allocateMatrix(matrixSize);
+        double **b = allocateMatrix(matrixSize);
+        double **c = allocateMatrix(matrixSize);
+        
         matrixSize=readSpecificMatrixPair(fname, 0, a, b);
         int mJobs = matrixSize*(matrixSize+1)/2;
 
@@ -322,6 +323,10 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        if (mJobs!=jobNum){
+            return 1;
+        }
+
 
         // Prepare shared data
         FineThreadData data;
@@ -329,7 +334,6 @@ int main(int argc, char *argv[]) {
         data.mutex = &mutex;
         data.jobAvailableCond = &jobAvailableCond;
         data.terminate = false;
-        data.jobsDoneCond = &jobsDoneCond;
         data.jobs = jobs;
         data.nextJob = 0;
         data.jobsCompleted = 0; // Reset jobsCompleted for the new batch
@@ -342,6 +346,7 @@ int main(int argc, char *argv[]) {
             nThreads = mJobs;
         }
 
+        pthread_t threads[nThreads];
 
         for (int i = 0; i < nThreads; ++i) {
             if (pthread_create(&threads[i], NULL, fine_worker, &data) != 0) {
@@ -351,24 +356,26 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        for(int k = 0; k < nmats; k++) {
-            readSpecificMatrixPair(fname, k, a, b);// assume matrix size is constant
-            //printf("%d %d %d \n",jobNum,i,j);
+
+        for (int k = 0; k < nmats; ++k) {
+            // Read and process the matrix pair
+            readSpecificMatrixPair(fname, k, a, b);
 
             pthread_mutex_lock(&mutex);
             data.nextJob = 0;
-            data.jobsCompleted = 0; // Reset jobsCompleted for the new batch
-            data.totalJobs = mJobs;
+            data.jobsCompleted = 0;
+            data.totalJobs = mJobs; // Ensure this is set correctly for each batch
             pthread_mutex_unlock(&mutex);
 
-            pthread_cond_broadcast(&jobAvailableCond); // Signal threads for new jobs
+            pthread_cond_broadcast(&jobAvailableCond);
 
-            pthread_mutex_lock(&mutex);
+            // Wait for jobs to complete
+
             while (data.jobsCompleted < data.totalJobs) {
-                pthread_cond_wait(&data.jobsDoneCond, &mutex);
+                ;
             }
-            pthread_mutex_unlock(&mutex);
-            
+
+            // Output results, etc.
             snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s", fname, k, "FINE.dat");
             writeMatrixToFile(c, matrixSize, newFilename);
         }
@@ -383,9 +390,8 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < nThreads; ++i) {
             pthread_join(threads[i], NULL);
         }
-        pthread_cond_destroy(&jobAvailableCond);
-        pthread_cond_destroy(&jobsDoneCond);
-        // Free memory
+
+        // Clean up and free resources
         free(*a);
         free(a);
         free(*b);
@@ -393,6 +399,9 @@ int main(int argc, char *argv[]) {
         free(*c);
         free(c);
         free(jobs);
+
+        pthread_mutex_destroy(&mutex);
+        pthread_cond_destroy(&jobAvailableCond);
         //END
         /*
         int mJobs = nmats*matrixSize*matrixSize;
