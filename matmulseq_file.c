@@ -55,6 +55,16 @@ void *coarse_worker(void *arg) {
     int matrixSize;
     int nmats;
 
+    pthread_mutex_lock(data->mutex);
+    Job job = data->jobs[data->nextJob];
+    pthread_mutex_unlock(data->mutex);
+    // asumme same matrixsize
+    readMatrixInfo(job.fname, &nmats, &matrixSize);
+    //Dynamically create matrices of the size needed
+    a = allocateMatrix(matrixSize);
+    b = allocateMatrix(matrixSize);
+    c = allocateMatrix(matrixSize);
+
     while (1) {
         pthread_mutex_lock(data->mutex);
         if (data->nextJob >= data->totalJobs) {
@@ -76,15 +86,23 @@ void *coarse_worker(void *arg) {
             printf("Multiplying two matrices...\n"); //Remove this line for performance tests
         }
 
-        //Dynamically create matrices of the size needed
-        a = allocateMatrix(matrixSize);
-        b = allocateMatrix(matrixSize);
-        c = allocateMatrix(matrixSize);
 
         matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b);
+
+        // //Dynamically create matrices of the size needed
+        // a = allocateMatrix(matrixSize);
+        // b = allocateMatrix(matrixSize);
+        // c = allocateMatrix(matrixSize);
+
         mm(a, b, c, matrixSize);
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",job.fname, job.pair, "COARSE.dat");
         writeMatrixToFile(c,matrixSize,newFilename);
+        // free(*a);
+        // free(a);
+        // free(*b);
+        // free(b);
+        // free(*c);
+        // free(c);
     }
 
     free(*a);
@@ -345,7 +363,7 @@ int main(int argc, char *argv[]) {
         }
 
         for(int k = 0; k < nmats; k++) {
-            matrixSize = readSpecificMatrixPair(fname, k, a, b);
+            readSpecificMatrixPair(fname, k, a, b);// assume matrix size is constant
             //printf("%d %d %d \n",jobNum,i,j);
 
             pthread_mutex_lock(&mutex);
