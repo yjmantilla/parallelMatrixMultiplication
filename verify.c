@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
     MAT2 = allocateMatrix(matrixSize);
     int equal;
     // Verification
+    int result=0;
     for(int k=0;k<nmats;k++){
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s.dat",fname, k, mode1);
         matrixSize=readMatrixFromFile(newFilename,&MAT1);
@@ -52,6 +53,9 @@ int main(int argc, char *argv[]) {
            printf("The matrices are equal for product %d from %s.\n",k,fname);
         } else {
             printf("The matrices are not equal for product %d from %s.\n",k,fname);
+            result =1;
         }
     }
+    printf("Check = %d (0:ok, 1:at least one bad)\n",result);
+    return result; // 0 ok, 1 at least one bad.
 }

@@ -69,3 +69,12 @@ for x in range(1, 33):
     run_experiment("PYTHON", x, N_REPETITIONS, result_file)
 
 print("Experiments completed.")
+
+
+# Verify
+
+for MODE in ['COARSE']:#,'FINE','FINEHUNGRY','PYTHON']:
+    command=['./verify', DATFILE,'REF', MODE]
+    result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
+    print("Checking ",MODE)
+    print(result.stdout)
