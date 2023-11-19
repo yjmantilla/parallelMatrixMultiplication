@@ -56,7 +56,7 @@ for x in range(1, 33):
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
 
-# Run experiments for FINE mode with varying X
+# Run experiments for FINEHUNGRY mode with varying X
 for x in range(1, 33):
     print('FINEHUNGRY',x)
     result_file = f"results/results_FINEHUNGRY_X{x}.csv"
