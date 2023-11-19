@@ -8,7 +8,7 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 5
+N_REPETITIONS = 20
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
@@ -73,7 +73,7 @@ print("Experiments completed.")
 
 # Verify
 
-for MODE in ['COARSE']:#,'FINE','FINEHUNGRY','PYTHON']:
+for MODE in ['COARSE','FINE','FINEHUNGRY','PYTHON']:
     command=['./verify', DATFILE,'REF', MODE]
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
     print("Checking ",MODE)

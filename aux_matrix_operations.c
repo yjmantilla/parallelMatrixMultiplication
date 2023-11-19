@@ -61,18 +61,26 @@ void mmSingle(double **a, double **b, double **c, int matrixSize, int i, int j) 
     int k;
     double sumA;
     double sumB;
-
+    int diff=j!=i;
     // Single dot product
     sumA = 0.0;
     sumB = 0.0;
-    // dot product
-    for (k = 0; k < matrixSize; k++) {
-        sumA += a[i][k] * b[k][j];
-        sumB += a[j][k] * b[k][i];
-    }
-    c[i][j] = sumA; // there shouldnt be race conditions as each thread touches a different position...
-    c[j][i] = sumB;
 
+    if (diff){// unrolled branches to reduce conditional overhead to only 1 check
+        for (k = 0; k < matrixSize; k++) {
+            sumA += a[i][k] * b[k][j];
+            sumB += a[j][k] * b[k][i];
+        }
+        c[i][j] = sumA; // there shouldnt be race conditions as each thread touches a different position...
+        c[j][i] = sumB;
+    }
+    else{
+        // dot product
+        for (k = 0; k < matrixSize; k++) {
+            sumA += a[i][k] * b[k][j];
+        }
+        c[i][j] = sumA; // there shouldnt be race conditions as each thread touches a different position...
+    }
 }
 
 void printResult(double **matrix, int size) {
