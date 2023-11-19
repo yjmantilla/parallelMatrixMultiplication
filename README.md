@@ -5,9 +5,7 @@
 ### Install required python libraries
 
 ```bash
-pip install numpy
-pip install joblib
-pip install pandas
+pip install numpy joblib pandas seaborn
 ```
 
 ### Compile using make
@@ -24,6 +22,15 @@ You can setup N_REPETITIONS in the code. This will configure how many times a si
 
 The idea is to estimate the timing from more than one measure of the execution time.
 
+### Running the analysis
+
+To collect the results and produce the plots.
+
+```bash
+python3 analysis.py results/
+```
+
+The plots will generate in the results/plots folder.
 
 ### Running individual codes
 
