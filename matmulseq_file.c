@@ -34,9 +34,10 @@ void *coarse_worker(void *arg) {
 
     pthread_mutex_lock(data->mutex);
     Job job = data->jobs[data->nextJob];
-    pthread_mutex_unlock(data->mutex);
     // asumme same matrixsize
-    readMatrixInfo(job.fname, &nmats, &matrixSize);
+    readMatrixInfo(job.fname, &nmats, &matrixSize); // it seems to be more safe to open the file in order
+    pthread_mutex_unlock(data->mutex);
+
     //Dynamically create matrices of the size needed
     a = allocateMatrix(matrixSize);
     b = allocateMatrix(matrixSize);
