@@ -88,7 +88,7 @@ def plot_mean_time_vs_t(data_frames, output_folder):
     plt.xlabel('Number of Threads (T)')
     plt.ylabel('Mean Execution Time (secs)')
     plt.legend()
-    plt.savefig(os.path.join(output_folder, 'mean_time_vs_t.png'))
+    plt.savefig(os.path.join(output_folder, 'mean_time_vs_t.png'),dpi=300)
 
 def main(folder_path):
     data_frames = read_data(folder_path)
