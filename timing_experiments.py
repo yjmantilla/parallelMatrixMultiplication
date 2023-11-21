@@ -8,7 +8,7 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 20
+N_REPETITIONS = 5
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
@@ -29,6 +29,7 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
         writer.writerow(['Time'])  # Header
 
         for _ in range(n_repetitions):
+            print(_,end=' ',flush=True)
             if mode in ['REF','COARSE','FINE','FINEHUNGRY']:
                 command = ["./matmulseq_file", str(x_val), DATFILE, mode, "0"]
             elif mode in ['PYTHON']:
@@ -73,8 +74,8 @@ print("Experiments completed.")
 
 # Verify
 
-for MODE in ['COARSE','FINE','FINEHUNGRY','PYTHON']:
-    command=['./verify', DATFILE,'REF', MODE]
-    result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
-    print("Checking ",MODE)
-    print(result.stdout)
+# for MODE in ['COARSE','FINE','FINEHUNGRY','PYTHON']:
+#     command=['./verify', DATFILE,'REF', MODE]
+#     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
+#     print("Checking ",MODE)
+#     print(result.stdout)

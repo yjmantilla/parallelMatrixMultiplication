@@ -68,8 +68,10 @@ void *coarse_worker(void *arg) {
         matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b);
 
         mm(a, b, c, matrixSize);
+        if (job.verbose){
         snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",job.fname, job.pair, "COARSE.dat");
         writeMatrixToFile(c,matrixSize,newFilename);
+        }
     }
 
     free(*a);
@@ -88,8 +90,10 @@ typedef struct {
     int pair;
     // Other job-specific data
     int verbose;
-    int i;
-    int j;
+    int *is;
+    int *js;
+    int start;
+    int end;
     double **matrixRefA; // Reference to a matrix (double pointer)
     double **matrixRefB; // Reference to a matrix (double pointer)
     double **matrixRefC; // Reference to a matrix (double pointer)
@@ -130,7 +134,7 @@ void *fine_worker(void *arg) {
         pthread_mutex_unlock(data->mutex);
 
         // Process the job
-        mmSingle(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize, job.i, job.j);
+        mmFine(job.matrixRefA, job.matrixRefB, job.matrixRefC, job.matrixSize, job.is, job.js,job.start, job.end);
 
         pthread_mutex_lock(data->mutex);
         data->jobsCompleted++;
@@ -150,11 +154,14 @@ typedef struct {
     int pair;
     // Other job-specific data
     int verbose;
-    int i;
-    int j;
-    double **matrixRefA; // Reference to a matrix (double pointer)
-    double **matrixRefB; // Reference to a matrix (double pointer)
-    double **matrixRefC; // Reference to a matrix (double pointer)
+    int *is;
+    int *js;
+    int start;
+    int end;
+    int nmats;
+    double ***matrixRefA; // Reference to a matrix (double pointer)
+    double ***matrixRefB; // Reference to a matrix (double pointer)
+    double ***matrixRefC; // Reference to a matrix (double pointer)
     int matrixSize;
 } FineHungryJob;
 
@@ -162,7 +169,7 @@ typedef struct {
     int totalJobs;
     int nextJob;
     int jobsCompleted;
-    FineJob *jobs;
+    FineHungryJob *jobs;
     pthread_mutex_t *mutex;
 } FineHungryThreadData;
 
@@ -185,7 +192,7 @@ void *fineHungry_worker(void *arg) {
         }
 
         // Process the job...
-        mmSingle(job->matrixRefA, job->matrixRefB, job->matrixRefC, job->matrixSize, job->i, job->j);
+        mmFineHungry(job->matrixRefA, job->matrixRefB, job->matrixRefC, job->matrixSize, job->is, job->js,job->start,job->end,job->nmats);
     }
     return NULL;
 }
@@ -193,9 +200,9 @@ void *fineHungry_worker(void *arg) {
 int main(int argc, char *argv[]) {
 
     // Default values
-    int defaultNThreads = 1; // Default number of threads
-    char defaultDatafile[256] = "matrices_dev.dat"; // Default data file name
-    char defaultMode[20] = "FINE"; // Default mode
+    int defaultNThreads = 3; // Default number of threads
+    char defaultDatafile[256] = "matrices_large.dat"; // Default data file name
+    char defaultMode[20] = "FINEHUNGRY"; // Default mode
     int defaultVerbose = 0; // Default verbose mode (disabled)
 
     // Variables to store actual values, initialized to defaults
@@ -260,10 +267,10 @@ int main(int argc, char *argv[]) {
             }
             mm(a, b, c, matrixSize);
             if (verbose){
-                printResult(c,matrixSize); //Remove this line for performance tests
+                //printResult(c,matrixSize); //Remove this line for performance tests
+                snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF.dat");
+                writeMatrixToFile(c,matrixSize,newFilename);
             }
-            snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "REF.dat");
-            writeMatrixToFile(c,matrixSize,newFilename);
         }
         // Free memory
         free(*a);
@@ -345,8 +352,7 @@ int main(int argc, char *argv[]) {
         double **c = allocateMatrix(matrixSize);
         
         matrixSize=readSpecificMatrixPair(fname, 0, a, b);
-        int mJobs = matrixSize*(matrixSize+1)/2;
-
+        int mJobs=nThreads;
         FineJob *jobs = malloc(mJobs * sizeof(FineJob));
 
         if (!jobs) {
@@ -354,26 +360,59 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        // Initialize jobs
-        int jobNum =0;
-        for (int i = 0; i < matrixSize; i++) {
-            for (int j = i; j < matrixSize; j++){
-                jobs[jobNum].verbose=verbose;
-                jobs[jobNum].i=i;
-                jobs[jobNum].j=j;
-                jobs[jobNum].matrixRefA=a;
-                jobs[jobNum].matrixRefB=b;
-                jobs[jobNum].matrixRefC=c;
-                jobs[jobNum].matrixSize=matrixSize;
-                //printf("%d %d %d \n",jobNum,i,j);
-                jobNum++;
-            }
-        }
+        // Job Assignment Logic
 
-        if (mJobs!=jobNum){
+        int division = (matrixSize*matrixSize)/nThreads;
+        int residue = (matrixSize*matrixSize)%nThreads;
+
+        int *is = (int *)malloc(matrixSize * matrixSize * sizeof(int));
+        int *js = (int *)malloc(matrixSize * matrixSize * sizeof(int));
+
+        if (!is || !js) {
+            perror("Failed to allocate memory for is and js");
+            // Handle memory allocation failure (e.g., by freeing already allocated memory and exiting)
+            free(is); // Free is if it was allocated
+            free(js); // Free js if it was allocated
             return 1;
         }
 
+        int flat_index=0;
+        for (int i = 0; i < matrixSize; i++) {
+            for (int j = 0; j < matrixSize; j++) {
+                is[flat_index] = i;
+                js[flat_index] = j;
+                flat_index++;
+            }
+        }
+
+        // Initialize jobs
+        int jobNum =0;
+        int _start=0;
+        int _end;
+        for (int d = 0; d < nThreads; d++) {
+            jobs[jobNum].verbose=verbose;
+            _end = _start+division;
+            jobs[jobNum].is = is;
+            jobs[jobNum].js = js;
+            jobs[jobNum].start=_start;
+            jobs[jobNum].end=_end;
+            jobs[jobNum].matrixRefA=a;
+            jobs[jobNum].matrixRefB=b;
+            jobs[jobNum].matrixRefC=c;
+            jobs[jobNum].matrixSize=matrixSize;
+            _start=_end;
+            //printf("%d %d %d \n",jobNum,i,j);
+            jobNum++;
+        }
+
+        if (residue!=0){ // last one
+            jobs[jobNum-1].end+=residue;
+            //last one is one lest than jobNum
+        }
+
+        if(jobNum!=nThreads){
+            return 1;
+        }
 
         // Prepare shared data
         FineThreadData data;
@@ -389,8 +428,9 @@ int main(int argc, char *argv[]) {
         // Debug worker
         //fine_worker(&data);
 
-        if (nThreads > mJobs){
-            nThreads = mJobs;
+        if (nThreads != mJobs){
+            printf("wrong");
+            return 1;
         }
 
         pthread_t threads[nThreads];
@@ -423,8 +463,10 @@ int main(int argc, char *argv[]) {
             }
 
             // Output results, etc.
+            if (verbose){
             snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s", fname, k, "FINE.dat");
             writeMatrixToFile(c, matrixSize, newFilename);
+            }
         }
 
         // Signal to threads that all jobs are complete
@@ -446,6 +488,8 @@ int main(int argc, char *argv[]) {
         free(*c);
         free(c);
         free(jobs);
+        free(is);
+        free(js);
 
         pthread_mutex_destroy(&mutex);
         pthread_cond_destroy(&jobAvailableCond);
@@ -456,16 +500,11 @@ int main(int argc, char *argv[]) {
         pthread_mutex_t mutex;
         pthread_mutex_init(&mutex, NULL);
 
-        int mJobs = nmats*matrixSize*(matrixSize+1)/2;
-
+        int mJobs=nThreads;
         FineHungryJob *jobs = malloc(mJobs * sizeof(FineHungryJob));
         if (!jobs) {
             perror("Failed to allocate memory for jobs");
             return 1;
-        }
-
-        if (nThreads > mJobs){
-            nThreads = mJobs;
         }
 
         pthread_t threads[nThreads];
@@ -503,24 +542,63 @@ int main(int argc, char *argv[]) {
             readSpecificMatrixPair(fname, k, matricesA[k], matricesB[k]);
         }
 
-        // Initialize jobs
-        int jobNum =0;
-        for (int pair=0; pair < nmats; pair++){
-            for (int i = 0; i < matrixSize; i++) {
-                for (int j = i; j < matrixSize; j++){
-                    jobs[i].jobId = jobNum; // Example job initialization
-                    jobs[jobNum].pair=pair;
-                    jobs[jobNum].verbose=verbose;
-                    jobs[jobNum].i=i;
-                    jobs[jobNum].j=j;
-                    jobs[jobNum].matrixRefA=matricesA[pair];
-                    jobs[jobNum].matrixRefB=matricesB[pair];
-                    jobs[jobNum].matrixRefC=matricesC[pair];
-                    jobs[jobNum].matrixSize=matrixSize;
-                    jobNum++;
-                }
+
+
+        // Job Assignment Logic
+
+        int division = (matrixSize*matrixSize)/nThreads;
+        int residue = (matrixSize*matrixSize)%nThreads;
+
+        int *is = (int *)malloc(matrixSize * matrixSize * sizeof(int));
+        int *js = (int *)malloc(matrixSize * matrixSize * sizeof(int));
+
+        if (!is || !js) {
+            perror("Failed to allocate memory for is and js");
+            // Handle memory allocation failure (e.g., by freeing already allocated memory and exiting)
+            free(is); // Free is if it was allocated
+            free(js); // Free js if it was allocated
+            return 1;
+        }
+
+        int flat_index=0;
+        for (int i = 0; i < matrixSize; i++) {
+            for (int j = 0; j < matrixSize; j++) {
+                is[flat_index] = i;
+                js[flat_index] = j;
+                flat_index++;
             }
         }
+
+        // Initialize jobs
+        int jobNum =0;
+        int _start=0;
+        int _end;
+        for (int d = 0; d < nThreads; d++) {
+            jobs[jobNum].verbose=verbose;
+            _end = _start+division;
+            jobs[jobNum].is = is;
+            jobs[jobNum].js = js;
+            jobs[jobNum].start=_start;
+            jobs[jobNum].end=_end;
+            jobs[jobNum].matrixRefA=matricesA;
+            jobs[jobNum].matrixRefB=matricesB;
+            jobs[jobNum].matrixRefC=matricesC;
+            jobs[jobNum].matrixSize=matrixSize;
+            jobs[jobNum].nmats=nmats;
+            _start=_end;
+            //printf("%d %d %d \n",jobNum,i,j);
+            jobNum++;
+        }
+
+        if (residue!=0){ // last one
+            jobs[jobNum-1].end+=residue;
+            //last one is one lest than jobNum
+        }
+
+        if(jobNum!=nThreads){
+            return 1;
+        }
+
 
         // Prepare shared data
         FineHungryThreadData data;
@@ -547,10 +625,11 @@ int main(int argc, char *argv[]) {
             pthread_join(threads[i], NULL);
         }
         //Write Results
-
+        if (verbose){
         for(int k=0;k<nmats;k++){
             snprintf(newFilename, sizeof(newFilename), "results/%s.result.%d.%s",fname, k, "FINEHUNGRY.dat");
             writeMatrixToFile(matricesC[k],matrixSize,newFilename);
+        }
         }
 
         free(jobs);

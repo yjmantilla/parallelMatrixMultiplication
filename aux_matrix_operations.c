@@ -83,6 +83,47 @@ void mmSingle(double **a, double **b, double **c, int matrixSize, int i, int j) 
     }
 }
 
+void mmFine(double **a, double **b, double **c, int matrixSize, int* is, int*  js,int start,int end) {
+    int k;
+    double sum;
+    sum = 0.0;
+    int i,j;
+
+    
+    for (int l = start; l < end; l++) {
+        sum = 0.0;
+        i=is[l];
+        j=js[l];
+        // dot product
+        for (k = 0; k < matrixSize; k++) {
+            sum += a[i][k] * b[k][j];
+        }
+        c[i][j] = sum;
+    }
+
+}
+
+void mmFineHungry(double ***a, double ***b, double ***c, int matrixSize, int* is, int*  js,int start,int end, int nmats) {
+    int k;
+    double sum;
+    int i,j;
+
+    for (int pair = 0; pair < nmats; pair++) {
+    for (int l = start; l < end; l++) {
+        sum = 0.0;
+        i=is[l];
+        j=js[l];
+        // dot product
+        for (k = 0; k < matrixSize; k++) {
+            sum += a[pair][i][k] * b[pair][k][j];
+        }
+        c[pair][i][j] = sum;
+    }
+    }
+
+}
+
+
 void printResult(double **matrix, int size) {
     int i, j;
     for(i = 0; i < size; i++) {

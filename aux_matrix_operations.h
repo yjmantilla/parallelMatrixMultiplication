@@ -11,6 +11,8 @@
 double **allocateMatrix(int size);
 void mm(double **a, double **b, double **c, int matrixSize);
 void mmSingle(double **a, double **b, double **c, int matrixSize, int i, int j);
+void mmFine(double **a, double **b, double **c, int matrixSize, int* is, int*  js,int start,int end);
+void mmFineHungry(double ***a, double ***b, double ***c, int matrixSize, int* is, int* js,int start,int end, int nmats);
 void printResult(double **matrix, int size);
 void writeMatrixToFile(double **matrix, int size, const char *filename);
 int readMatrixFromFile(const char *filename, double ***matrixPtr);
