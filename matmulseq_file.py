@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description="Parallel Matrix Multiplication")
 # Add arguments
 parser.add_argument('filename', type=str, default="/home/user/code/parallelMatrixMultiplication/matrices_dev.dat",help='Path to the matrix file')
 parser.add_argument('--n_jobs', type=int, default=4, help='Number of jobs to run in parallel (default: 4)')
-parser.add_argument('--verbose', action='store_true', help='Enable verbose output')
+parser.add_argument('--verbose', type=int, default=0,help='Verbose 1|0')
 
 # Parse arguments
 args = parser.parse_args()
@@ -93,47 +93,70 @@ def write_matrix_to_file(matrix, size, filename):
             file.write("\n")
 
 
-def process_matrix_pair(pair, filename, verbose):
-    # Load the shared library
+def prepare_matrix_pair(pair, filename, verbose):
+    nmats, matrix_size = read_matrix_info(filename)
+    matrix_a, matrix_b = read_matrix_pair(filename, pair, matrix_size)
+    matrix_c = [[0.0 for _ in range(matrix_size)] for _ in range(matrix_size)]
+
+
+    # if verbose:
+    #     print("Matrix A:", matrix_a)
+    #     print("Matrix B:", matrix_b)
+    return matrix_a,matrix_b,matrix_c
+
+def compute(matrix_a,matrix_b,matrix_c,matrix_size):
     mylib = CDLL('/home/user/code/parallelMatrixMultiplication/libaux_matrix_operations.so')
     mylib.mm.argtypes = [POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), c_int]
     mylib.mm.restype = None
-
-    nmats, matrix_size = read_matrix_info(filename)
-    verbose=False
-
-    matrix_a, matrix_b = read_matrix_pair(filename, pair, matrix_size)
-    matrix_c = [[0.0 for _ in range(matrix_size)] for _ in range(matrix_size)]
 
     c_matrix_a, np_matrix_a = create_c_matrix(matrix_a, matrix_size)
     c_matrix_b, np_matrix_b = create_c_matrix(matrix_b, matrix_size)
     c_matrix_c, np_matrix_c = create_c_matrix(matrix_c, matrix_size)
 
-    if verbose:
-        print("Matrix A:", matrix_a)
-        print("Matrix B:", matrix_b)
 
     mylib.mm(c_matrix_a, c_matrix_b, c_matrix_c, matrix_size)
     result_matrix_c = [[c_matrix_c[i][j] for j in range(matrix_size)] for i in range(matrix_size)]
-
+    return result_matrix_c
+def postprocess(c_matrix_c,matrix_size,pair):
+    
     fname = os.path.basename(filename)
     dname = os.path.dirname(filename)
     new_filename = f"{dname}/results/{fname}.result.{pair}.PYTHON.dat"
-    write_matrix_to_file(result_matrix_c, matrix_size, new_filename)
+    write_matrix_to_file(c_matrix_c, matrix_size, new_filename)
+
+start_time = time.time()
 
 
 nmats, matrix_size = read_matrix_info(filename)
-verbose = False
 
 # Parallel processing
 
+matricesA=[None]*nmats
+matricesB=[None]*nmats
+matricesC=[None]*nmats
+for pair in range(nmats):
+    matricesA[pair],matricesB[pair],matricesC[pair]=prepare_matrix_pair(pair,filename,verbose)
+
+compstart = time.time()
+
 # Start timing
-start_time = time.time()
-Parallel(n_jobs=n_jobs)(delayed(process_matrix_pair)(pair, filename, verbose) for pair in range(nmats))
+results=Parallel(n_jobs=n_jobs)(delayed(compute)(matricesA[pair], matricesB[pair], matricesC[pair],matrix_size) for pair in range(nmats))
 # End timing
+
+compend = time.time()
+comp_time = compend - compstart
+matricesC=results
+if (verbose):
+    Parallel(n_jobs=n_jobs)(delayed(postprocess)(matricesC[pair],matrix_size,pair) for pair in range(nmats))
+
 end_time = time.time()
 
 # Calculate elapsed time
 elapsed_time = end_time - start_time
 
-print(f"Elapsed time: {elapsed_time} seconds")
+print("Number of threads:", n_jobs)
+print("Datafile:", filename)
+print("Mode:", "PYTHON")
+print("Verbose Mode:",verbose)
+print(f"Total time: {elapsed_time} seconds")
+print(f"Computation time: {comp_time} seconds")

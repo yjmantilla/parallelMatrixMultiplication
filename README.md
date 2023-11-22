@@ -37,9 +37,8 @@ The plots will generate in the results/plots folder.
 There are four ways to run the multiplications:
 
 1. C-based "REF" (the one provided by the course)
-1. C-based "COARSE" (runs a single multiplication of pairs per thread until there are none left)
-1. C-based "FINE" (runs 2 row*column products of the 2 matrices per thread)
-1. C-based "FINEHUNGRY" (runs 2 row*column products of the 2 matrices per thread using more memory)
+1. C-based "COARSE"
+1. C-based "FINE"
 1. "PYTHON" (Python parallelism of the coarse type + C function)
 
 For C-based multiplication use

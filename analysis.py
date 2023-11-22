@@ -14,11 +14,13 @@ def read_data(folder_path):
         dfs[file.split('.')[0]] = pd.read_csv(path)
     return dfs
 
-def combine_dfs_with_t(dfs):
+def combine_dfs_with_t(dfs, time_column):
     # Combine dataframes with an additional column for T (number of threads)
+    # and use the specified time column
     combined_df = pd.DataFrame()
     for key, df in dfs.items():
         df['T'] = int(key.split('_')[-1][1:])
+        df['Time'] = df[time_column]  # Use the specified time column
         combined_df = pd.concat([combined_df, df])
     return combined_df
 
@@ -27,7 +29,7 @@ def find_best_t(df):
     avg_times = df.groupby('T')['Time'].mean()
     return avg_times.idxmin(), avg_times.min()
 
-def plot_boxplots(data_frames, output_folder):
+def plot_boxplots(data_frames, output_folder,time_column):
     # Define the color palette
     cmap = 'hls'
 
@@ -36,71 +38,73 @@ def plot_boxplots(data_frames, output_folder):
     plt.figure(figsize=(10, 6))
     sns.boxplot(data=ref_df, palette=cmap)
     plt.title('Boxplot for REF Method')
-    plt.ylabel('Execution Time (secs)')
-    plt.savefig(os.path.join(output_folder, 'boxplot_ref.png'))
+    plt.ylabel(f'{time_column} (secs)')
+    plt.savefig(os.path.join(output_folder, f'boxplot_ref__{time_column}.png'))
 
     # Individual Boxplots for Each Method
-    methods = ['COARSE', 'FINE', 'FINEHUNGRY', 'PYTHON']
+    methods = ['COARSE', 'FINE', 'PYTHON']
     for method in methods:
         dfs = {key: df for key, df in data_frames.items() if method in key}
-        combined = combine_dfs_with_t(dfs)
+        combined = combine_dfs_with_t(dfs,time_column)
         plt.figure(figsize=(10, 6))
-        sns.boxplot(x="T", y="Time", data=combined, hue="T", palette=cmap, legend=False)
+        sns.boxplot(x="T", y=time_column, data=combined, hue="T", palette=cmap, legend=False)
         plt.title(f'{method} Method Boxplot by Number of Threads')
         plt.xlabel('Number of Threads (T)')
-        plt.ylabel('Execution Time (secs)')
-        plt.savefig(os.path.join(output_folder, f'boxplot_{method}.png'))
+        plt.ylabel(f'{time_column} (secs)')
+        plt.savefig(os.path.join(output_folder, f'boxplot_{method}__{time_column}.png'))
 
     # Best T Comparison Boxplot
     combined_best_df = pd.DataFrame()
     for method in methods:
         dfs = {key: df for key, df in data_frames.items() if method in key}
-        combined = combine_dfs_with_t(dfs)
+        combined = combine_dfs_with_t(dfs,time_column)
         best_t, _ = find_best_t(combined)
         best_df = combined[combined['T'] == best_t]
         combined_best_df = pd.concat([combined_best_df, best_df.assign(Method=method)])
     combined_best_df = pd.concat([combined_best_df, ref_df.assign(Method="REF")])
 
     plt.figure(figsize=(12, 8))
-    sns.boxplot(x="Method", y="Time", data=combined_best_df, palette=cmap)
+    sns.boxplot(x="Method", y=time_column, data=combined_best_df, palette=cmap)
     plt.title('Comparison of Best T for Each Method Including REF')
     plt.xlabel('Method')
-    plt.ylabel('Execution Time (secs)')
-    plt.savefig(os.path.join(output_folder, 'best_t_comparison.png'))
+    plt.ylabel(f'{time_column} (secs)')
+    plt.savefig(os.path.join(output_folder, f'best_t_comparison__{time_column}.png'))
 
 # Rest of your script remains the same
-def plot_mean_time_vs_t(data_frames, output_folder):
+def plot_mean_time_vs_t(data_frames, output_folder,time_column):
     plt.figure(figsize=(12, 8))
-    methods = ['COARSE', 'FINE', 'FINEHUNGRY', 'PYTHON']
+    methods = ['COARSE', 'FINE', 'PYTHON']
 
     # Plotting mean times for each method
     for method in methods:
         dfs = {key: df for key, df in data_frames.items() if method in key}
-        combined = combine_dfs_with_t(dfs)
-        means = combined.groupby('T')['Time'].mean()
+        combined = combine_dfs_with_t(dfs,time_column)
+        means = combined.groupby('T')[time_column].mean()
         sns.lineplot(x=means.index, y=means.values, label=method)
 
     # Plotting REF as a constant line
-    ref_mean = data_frames['results_REF']['Time'].mean()
+    ref_mean = data_frames['results_REF'][time_column].mean()
     plt.axhline(y=ref_mean, color='gray', linestyle='--', label='REF')
 
-    plt.title('Mean Time vs. Number of Threads (T) for Each Method')
+    plt.title(f'Mean {time_column} vs. Number of Threads (T) for Each Method')
     plt.xlabel('Number of Threads (T)')
-    plt.ylabel('Mean Execution Time (secs)')
+    plt.ylabel(f'Mean {time_column} (secs)')
     plt.legend()
-    plt.savefig(os.path.join(output_folder, 'mean_time_vs_t.png'),dpi=300)
+    plt.savefig(os.path.join(output_folder, f'mean_time_vs_t__{time_column}.png'),dpi=300)
 
 def main(folder_path):
     data_frames = read_data(folder_path)
     output_folder = os.path.join(folder_path, 'plots')
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    plot_boxplots(data_frames, output_folder)
-    plot_mean_time_vs_t(data_frames, output_folder)
+
+    for time_col in ['Total Time', 'Computation Time']:
+        plot_boxplots(data_frames, output_folder, time_col)
+        plot_mean_time_vs_t(data_frames, output_folder, time_col)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python script.py <folder_path>")
     else:
         main(sys.argv[1])
-

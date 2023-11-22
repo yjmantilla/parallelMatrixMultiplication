@@ -8,25 +8,32 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 5
+N_REPETITIONS = 2
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
     output = result.stdout.strip()
 
     # Use a regular expression to find the elapsed time in the output
-    match = re.search(r'Elapsed time: ([\d.]+) seconds', output)
+    match = re.search(r'Total time: ([\d.]+) seconds', output)
     if match:
         elapsed_time = match.group(1)  # Extract the elapsed time
     else:
         elapsed_time = "Error"  # Or handle error appropriately
 
-    return elapsed_time
+    # Use a regular expression to find the elapsed time in the output
+    match = re.search(r'Computation time: ([\d.]+) seconds', output)
+    if match:
+        comp_time = match.group(1)  # Extract the elapsed time
+    else:
+        comp_time = "Error"  # Or handle error appropriately
+
+    return elapsed_time,comp_time
 
 def run_experiment(mode, x_val, n_repetitions, result_file):
     with open(result_file, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Time'])  # Header
+        writer.writerow(['Total Time','Computation Time'])  # Header
 
         for _ in range(n_repetitions):
             print(_,end=' ',flush=True)
@@ -36,8 +43,8 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
                 command = ["python3", "matmulseq_file.py", os.path.join(os.path.dirname(file_path),DATFILE), "--n_jobs", str(x_val)]
             else:
                 raise "BAD MODE"
-            real_time = run_command(command)
-            writer.writerow([real_time])
+            real_time,comp_time = run_command(command)
+            writer.writerow([real_time,comp_time])
         print('')
 
 
