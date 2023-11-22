@@ -8,7 +8,7 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 2
+N_REPETITIONS = 50
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
