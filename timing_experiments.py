@@ -30,7 +30,7 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
 
         for _ in range(n_repetitions):
             print(_,end=' ',flush=True)
-            if mode in ['REF','COARSE','FINE','FINEHUNGRY']:
+            if mode in ['REF','COARSE','FINE']:
                 command = ["./matmulseq_file", str(x_val), DATFILE, mode, "0"]
             elif mode in ['PYTHON']:
                 command = ["python3", "matmulseq_file.py", os.path.join(os.path.dirname(file_path),DATFILE), "--n_jobs", str(x_val)]
@@ -38,6 +38,7 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
                 raise "BAD MODE"
             real_time = run_command(command)
             writer.writerow([real_time])
+        print('')
 
 
 
@@ -56,12 +57,6 @@ for x in range(1, 33):
     print('FINE',x)
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
-
-# Run experiments for FINEHUNGRY mode with varying X
-for x in range(1, 33):
-    print('FINEHUNGRY',x)
-    result_file = f"results/results_FINEHUNGRY_X{x}.csv"
-    run_experiment("FINEHUNGRY", x, N_REPETITIONS, result_file)
 
 # Run experiments for PYTHON mode with varying X
 for x in range(1, 33):
