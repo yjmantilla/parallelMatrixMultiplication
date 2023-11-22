@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "aux_matrix_operations.h"
+#include <pthread.h>
+
 
 int main(int argc, char *argv[]) {
 
@@ -31,11 +33,15 @@ int main(int argc, char *argv[]) {
     printf("Mode2: %s\n", mode2);
 
 
+    pthread_mutex_t fileMutex;
+
+    pthread_mutex_init(&fileMutex, NULL);
+
     char *fname = datafile; //Change to matrices_large.dat for performance evaluation
     char newFilename[256]; // Adjust size as needed
     int matrixSize;
     int nmats;
-    readMatrixInfo(fname, &nmats, &matrixSize);
+    readMatrixInfo(fname, &nmats, &matrixSize,&fileMutex);
     double **MAT1, **MAT2;
     //Dynamically create matrices of the size needed
     MAT1 = allocateMatrix(matrixSize);
@@ -57,5 +63,6 @@ int main(int argc, char *argv[]) {
         }
     }
     printf("Check = %d (0:ok, 1:at least one bad)\n",result);
+    pthread_mutex_destroy(&fileMutex);
     return result; // 0 ok, 1 at least one bad.
 }
