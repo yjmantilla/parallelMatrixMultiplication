@@ -23,8 +23,6 @@ typedef struct {
     int totalJobs;
     int nextJob;
     pthread_mutex_t *mutex;
-    pthread_mutex_t *fmutex;
-    
 } ThreadData;
 
 void *coarse_worker(void *arg) {
@@ -39,7 +37,7 @@ void *coarse_worker(void *arg) {
     // asumme same matrixsize
     pthread_mutex_unlock(data->mutex);
 
-    readMatrixInfo(job.fname, &nmats, &matrixSize,data->fmutex); // it seems to be more safe to open the file in order
+    readMatrixInfo(job.fname, &nmats, &matrixSize); // it seems to be more safe to open the file in order
 
     //Dynamically create matrices of the size needed
     a = allocateMatrix(matrixSize);
@@ -56,9 +54,9 @@ void *coarse_worker(void *arg) {
         Job job = data->jobs[data->nextJob++];
         pthread_mutex_unlock(data->mutex);
 
-        readMatrixInfo(job.fname, &nmats, &matrixSize,data->fmutex);
+        readMatrixInfo(job.fname, &nmats, &matrixSize);
 
-        matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b,data->fmutex); // more safe to do this serially
+        matrixSize=readSpecificMatrixPair(job.fname, job.pair, a, b); // more safe to do this serially
 
 
         if (job.verbose){
@@ -209,7 +207,6 @@ typedef struct {
     double ***matricesA;
     double ***matricesB;
     char *fname;  // Filename
-    pthread_mutex_t *fmutex;
 
 } ReadTask;
 
@@ -217,7 +214,7 @@ typedef struct {
 void *readMatrices(void *arg) {
     ReadTask *task = (ReadTask *)arg;
     for (int k = task->start; k < task->end; ++k) {
-        readSpecificMatrixPair(task->fname, k, task->matricesA[k], task->matricesB[k],task->fmutex);
+        readSpecificMatrixPair(task->fname, k, task->matricesA[k], task->matricesB[k]);
     }
     return NULL;
 }
@@ -264,11 +261,8 @@ int main(int argc, char *argv[]) {
     char newFilename[256]; // Adjust size as needed
     int matrixSize;
     int nmats;
-    pthread_mutex_t fileMutex;
 
-    pthread_mutex_init(&fileMutex, NULL);
-
-    readMatrixInfo(fname, &nmats, &matrixSize,&fileMutex);
+    readMatrixInfo(fname, &nmats, &matrixSize);
 
 
     struct timespec start, end;
@@ -290,7 +284,7 @@ int main(int argc, char *argv[]) {
         }
 
         for(int k=0;k<nmats;k++){
-            matrixSize=readSpecificMatrixPair(fname, k, a, b,&fileMutex);
+            matrixSize=readSpecificMatrixPair(fname, k, a, b);
 
             if (verbose){
                 printf("Multiplying two matrices...\n"); //Remove this line for performance tests
@@ -345,7 +339,6 @@ int main(int argc, char *argv[]) {
         data.totalJobs = mJobs;
         data.nextJob = 0;
         data.mutex = &mutex;
-        data.fmutex= &fileMutex;
 
         // Debug worker
         //coarse_worker(&data);
@@ -372,7 +365,6 @@ int main(int argc, char *argv[]) {
 
         free(jobs);
         pthread_mutex_destroy(&mutex);
-        pthread_mutex_destroy(&fileMutex);
     }
 
 
@@ -384,7 +376,7 @@ int main(int argc, char *argv[]) {
         double **b = allocateMatrix(matrixSize);
         double **c = allocateMatrix(matrixSize);
         
-        matrixSize=readSpecificMatrixPair(fname, 0, a, b,&fileMutex);
+        matrixSize=readSpecificMatrixPair(fname, 0, a, b);
         int mJobs=nThreads;
         FineJob *jobs = malloc(mJobs * sizeof(FineJob));
 
@@ -479,7 +471,7 @@ int main(int argc, char *argv[]) {
 
         for (int k = 0; k < nmats; ++k) {
             // Read and process the matrix pair
-            readSpecificMatrixPair(fname, k, a, b,&fileMutex);
+            readSpecificMatrixPair(fname, k, a, b);
 
             pthread_mutex_lock(&mutex);
             data.nextJob = 0;
@@ -526,7 +518,6 @@ int main(int argc, char *argv[]) {
 
         pthread_mutex_destroy(&mutex);
         pthread_cond_destroy(&jobAvailableCond);
-        pthread_mutex_destroy(&fileMutex);
         //END
     }
     if (strcmp(mode,"FINEHUNGRY")==0){
@@ -582,7 +573,6 @@ int main(int argc, char *argv[]) {
             readTasks[i].matricesA = matricesA;
             readTasks[i].matricesB = matricesB;
             readTasks[i].fname = fname;
-            readTasks[i].fmutex=&fileMutex;
             pthread_create(&read_thread_ids[i], NULL, readMatrices, &readTasks[i]);
         }
 
@@ -698,7 +688,6 @@ int main(int argc, char *argv[]) {
         free(matricesB);
         free(matricesC);
         pthread_mutex_destroy(&mutex);
-        pthread_mutex_destroy(&fileMutex);
 
     }
 

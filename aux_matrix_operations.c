@@ -177,12 +177,10 @@ void readMatrixPair(FILE* fh, double** matrix, int matrixSize) {
     }
 }
 
-int readSpecificMatrixPair(const char* filename, int pairIndex, double** matrix1, double** matrix2, pthread_mutex_t *fmutex) {
-    pthread_mutex_lock(fmutex);
+int readSpecificMatrixPair(const char* filename, int pairIndex, double** matrix1, double** matrix2) {
     FILE* fh = fopen(filename, "r");
     if (fh == NULL) {
         fprintf(stderr, "Error opening file.\n");
-        pthread_mutex_unlock(fmutex);
         exit(1);
     }
 
@@ -193,8 +191,6 @@ int readSpecificMatrixPair(const char* filename, int pairIndex, double** matrix1
     if (fscanf(fh, "%d %d\n", &totalPairs, &matrixSize) != 2) {
         fprintf(stderr, "Error reading the first line of the file\n");
         fclose(fh);
-        pthread_mutex_unlock(fmutex);
-
         exit(1);
     }
     // Calculate the number of elements to skip
@@ -209,7 +205,6 @@ int readSpecificMatrixPair(const char* filename, int pairIndex, double** matrix1
             // Handle or report the error
             fprintf(stderr, "Error reading file during skip\n");
             fclose(fh);
-            pthread_mutex_unlock(fmutex);
             exit(1);
         }
     }
@@ -219,20 +214,16 @@ int readSpecificMatrixPair(const char* filename, int pairIndex, double** matrix1
     readMatrixPair(fh, matrix2, matrixSize);
 
     fclose(fh);
-    pthread_mutex_unlock(fmutex);
 
     return matrixSize;
 }
 
-void readMatrixInfo(const char* filename, int* nmats, int* matrixSize, pthread_mutex_t *fmutex) {
+void readMatrixInfo(const char* filename, int* nmats, int* matrixSize) {
 
-    pthread_mutex_lock(fmutex);
 
     FILE* fh = fopen(filename, "r");
     if (fh == NULL) {
         fprintf(stderr, "Error opening file %s.\n", filename);
-        pthread_mutex_unlock(fmutex);
-
         exit(1);
         
     }
@@ -240,12 +231,8 @@ void readMatrixInfo(const char* filename, int* nmats, int* matrixSize, pthread_m
     if (fscanf(fh, "%d %d\n", nmats, matrixSize) != 2) {
         fprintf(stderr, "File format error.\n");
         fclose(fh);
-        pthread_mutex_unlock(fmutex);
-
         exit(1);
     }
 
     fclose(fh);
-    pthread_mutex_unlock(fmutex);
-
 }
