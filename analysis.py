@@ -42,7 +42,7 @@ def plot_boxplots(data_frames, output_folder,time_column):
     plt.savefig(os.path.join(output_folder, f'boxplot_ref__{time_column}.png'))
 
     # Individual Boxplots for Each Method
-    methods = ['COARSE', 'FINE', 'PYTHON']
+    methods = ['COARSE', 'FINE', 'PYTHON']#,'FINE2']
     for method in methods:
         dfs = {key: df for key, df in data_frames.items() if method in key}
         combined = combine_dfs_with_t(dfs,time_column)
@@ -73,7 +73,7 @@ def plot_boxplots(data_frames, output_folder,time_column):
 # Rest of your script remains the same
 def plot_mean_time_vs_t(data_frames, output_folder,time_column):
     plt.figure(figsize=(12, 8))
-    methods = ['COARSE', 'FINE', 'PYTHON']
+    methods = ['COARSE', 'FINE','FINE2']#, 'PYTHON']
 
     # Plotting mean times for each method
     for method in methods:

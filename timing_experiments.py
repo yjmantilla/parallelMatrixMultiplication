@@ -8,7 +8,7 @@ file_path = os.path.realpath(__file__)
 # FILE
 DATFILE = 'matrices_large.dat'
 # Number of repetitions for each experiment
-N_REPETITIONS = 50
+N_REPETITIONS = 10
 
 def run_command(command):
     result = subprocess.run(command, stdout=subprocess.PIPE, text=True)
@@ -37,7 +37,7 @@ def run_experiment(mode, x_val, n_repetitions, result_file):
 
         for _ in range(n_repetitions):
             print(_,end=' ',flush=True)
-            if mode in ['REF','COARSE','FINE']:
+            if mode in ['REF','COARSE','FINE','FINE2']:
                 command = ["./matmulseq_file", str(x_val), DATFILE, mode, "0"]
             elif mode in ['PYTHON']:
                 command = ["python3", "matmulseq_file.py", os.path.join(os.path.dirname(file_path),DATFILE), "--n_jobs", str(x_val)]
@@ -64,6 +64,13 @@ for x in range(1, 33):
     print('FINE',x)
     result_file = f"results/results_FINE_X{x}.csv"
     run_experiment("FINE", x, N_REPETITIONS, result_file)
+
+
+# Run experiments for FINE2 mode with varying X
+for x in range(1, 33):
+    print('FINE2',x)
+    result_file = f"results/results_FINE2_X{x}.csv"
+    run_experiment("FINE2", x, N_REPETITIONS, result_file)
 
 # Run experiments for PYTHON mode with varying X
 for x in range(1, 33):

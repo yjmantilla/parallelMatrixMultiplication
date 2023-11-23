@@ -6,6 +6,7 @@ from joblib import Parallel, delayed
 import argparse
 import time
 
+from joblib import parallel_backend
 # Create the parser
 parser = argparse.ArgumentParser(description="Parallel Matrix Multiplication")
 
@@ -104,6 +105,8 @@ def prepare_matrix_pair(pair, filename, verbose):
     #     print("Matrix B:", matrix_b)
     return matrix_a,matrix_b,matrix_c
 
+
+
 def compute(matrix_a,matrix_b,matrix_c,matrix_size):
     mylib = CDLL('/home/user/code/parallelMatrixMultiplication/libaux_matrix_operations.so')
     mylib.mm.argtypes = [POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), POINTER(POINTER(c_double)), c_int]
@@ -113,10 +116,10 @@ def compute(matrix_a,matrix_b,matrix_c,matrix_size):
     c_matrix_b, np_matrix_b = create_c_matrix(matrix_b, matrix_size)
     c_matrix_c, np_matrix_c = create_c_matrix(matrix_c, matrix_size)
 
-
     mylib.mm(c_matrix_a, c_matrix_b, c_matrix_c, matrix_size)
     result_matrix_c = [[c_matrix_c[i][j] for j in range(matrix_size)] for i in range(matrix_size)]
     return result_matrix_c
+
 def postprocess(c_matrix_c,matrix_size,pair):
     
     fname = os.path.basename(filename)
@@ -136,6 +139,8 @@ matricesB=[None]*nmats
 matricesC=[None]*nmats
 for pair in range(nmats):
     matricesA[pair],matricesB[pair],matricesC[pair]=prepare_matrix_pair(pair,filename,verbose)
+
+
 
 compstart = time.time()
 

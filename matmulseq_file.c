@@ -148,6 +148,16 @@ void *readMatrices(void *arg) {
 
 int main(int argc, char *argv[]) {
 
+    struct timespec start, end;
+    double elapsed;
+
+    struct timespec compstart, compend;
+    double comp_elapsed=0;
+    double accum_comp=0;
+
+    // Start timing
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
     // Default values
     int defaultNThreads = 3; // Default number of threads
     char defaultDatafile[256] = "matrices_large.dat"; // Default data file name
@@ -192,15 +202,6 @@ int main(int argc, char *argv[]) {
     readMatrixInfo(fname, &nmats, &matrixSize);
 
 
-    struct timespec start, end;
-    double elapsed;
-
-    struct timespec compstart, compend;
-    double comp_elapsed=0;
-    double accum_comp=0;
-
-    // Start timing
-    clock_gettime(CLOCK_MONOTONIC, &start);
 
     if (strcmp(mode,"REF")==0){
 
@@ -754,8 +755,8 @@ int main(int argc, char *argv[]) {
     elapsed = end.tv_sec - start.tv_sec;
     elapsed += (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 
-    printf("Total time: %.3f seconds\n", elapsed);
-    printf("Computation time: %.3f seconds\n", accum_comp);
+    printf("Total time: %.9f seconds\n", elapsed);
+    printf("Computation time: %.9f seconds\n", accum_comp);
     if (verbose){
         printf("Done.\n");
     }
