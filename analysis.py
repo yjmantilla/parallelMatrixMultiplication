@@ -29,7 +29,7 @@ def find_best_t(df):
     avg_times = df.groupby('T')['Time'].mean()
     return avg_times.idxmin(), avg_times.min()
 
-def plot_boxplots(data_frames, output_folder,time_column):
+def plot_boxplots(data_frames, output_folder,time_column,methods):
     # Define the color palette
     cmap = 'hls'
 
@@ -39,10 +39,8 @@ def plot_boxplots(data_frames, output_folder,time_column):
     sns.boxplot(data=ref_df, palette=cmap)
     plt.title('Boxplot for REF Method')
     plt.ylabel(f'{time_column} (secs)')
-    plt.savefig(os.path.join(output_folder, f'boxplot_ref__{time_column}.png'))
+    plt.savefig(os.path.join(output_folder, f'boxplot_ref__{time_column}_{len(methods)}.pdf'))
 
-    # Individual Boxplots for Each Method
-    methods = ['COARSE', 'FINE', 'PYTHON']#,'FINE2']
     for method in methods:
         dfs = {key: df for key, df in data_frames.items() if method in key}
         combined = combine_dfs_with_t(dfs,time_column)
@@ -51,7 +49,7 @@ def plot_boxplots(data_frames, output_folder,time_column):
         plt.title(f'{method} Method Boxplot by Number of Threads')
         plt.xlabel('Number of Threads (T)')
         plt.ylabel(f'{time_column} (secs)')
-        plt.savefig(os.path.join(output_folder, f'boxplot_{method}__{time_column}.png'))
+        plt.savefig(os.path.join(output_folder, f'boxplot_{method}__{time_column}_{len(methods)}.pdf'))
 
     # Best T Comparison Boxplot
     combined_best_df = pd.DataFrame()
@@ -68,12 +66,11 @@ def plot_boxplots(data_frames, output_folder,time_column):
     plt.title('Comparison of Best T for Each Method Including REF')
     plt.xlabel('Method')
     plt.ylabel(f'{time_column} (secs)')
-    plt.savefig(os.path.join(output_folder, f'best_t_comparison__{time_column}.png'))
+    plt.savefig(os.path.join(output_folder, f'best_t_comparison__{time_column}_{len(methods)}.pdf'))
 
 # Rest of your script remains the same
-def plot_mean_time_vs_t(data_frames, output_folder,time_column):
+def plot_mean_time_vs_t(data_frames, output_folder,time_column,methods):
     plt.figure(figsize=(12, 8))
-    methods = ['COARSE', 'FINE','FINE2']#, 'PYTHON']
 
     # Plotting mean times for each method
     for method in methods:
@@ -90,7 +87,7 @@ def plot_mean_time_vs_t(data_frames, output_folder,time_column):
     plt.xlabel('Number of Threads (T)')
     plt.ylabel(f'Mean {time_column} (secs)')
     plt.legend()
-    plt.savefig(os.path.join(output_folder, f'mean_time_vs_t__{time_column}.png'),dpi=300)
+    plt.savefig(os.path.join(output_folder, f'mean_time_vs_t__{time_column}_{len(methods)}.pdf'),dpi=300)
 
 def main(folder_path):
     data_frames = read_data(folder_path)
@@ -99,9 +96,14 @@ def main(folder_path):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    for time_col in ['Total Time', 'Computation Time']:
-        plot_boxplots(data_frames, output_folder, time_col)
-        plot_mean_time_vs_t(data_frames, output_folder, time_col)
+
+            # Individual Boxplots for Each Method
+    methods = ['COARSE', 'FINE','FINE2']
+
+    for methods in [['COARSE', 'FINE','FINE2'],['COARSE', 'FINE','FINE2','PYTHON']]:
+        for time_col in ['Total Time', 'Computation Time']:
+            plot_boxplots(data_frames, output_folder, time_col,methods)
+            plot_mean_time_vs_t(data_frames, output_folder, time_col,methods)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
