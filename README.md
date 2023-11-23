@@ -39,6 +39,7 @@ There are four ways to run the multiplications:
 1. C-based "REF" (the one provided by the course)
 1. C-based "COARSE"
 1. C-based "FINE"
+1. C-based "FINE2"
 1. "PYTHON" (Python parallelism of the coarse type + C function)
 
 For C-based multiplication use
